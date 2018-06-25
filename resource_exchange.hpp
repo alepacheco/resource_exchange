@@ -1,30 +1,59 @@
-#include <eosiolib/types.hpp>
 #include <eosiolib/currency.hpp>
 #include <eosiolib/eosio.hpp>
+#include <eosiolib/singleton.hpp>
+#include <eosiolib/types.hpp>
 
 namespace eosio {
 class resource_exchange : public eosio::contract {
-private:
+ private:
   account_name _contract;
 
-public:
-  resource_exchange(account_name self) : _contract(self), eosio::contract(self), accounts(_self, _self) {}
+  //@abi table state i64
+  struct state {
+    asset liquid_funds = asset(0);
+    asset total_stacked = asset(0);
+    asset get_total() const { return liquid_funds + total_stacked; }
+    EOSLIB_SERIALIZE(state, (liquid_funds)(total_stacked))
+  };
+
+  typedef singleton<N(state), state> state_index;
+  state_index contract_state;
+
+  void delegatebw(account_name receiver, asset stake_net_quantity,
+                  asset stake_cpu_quantity);
+  void undelegatebw(account_name receiver, asset stake_net_quantity,
+                    asset stake_cpu_quantity);
+
+  int64_t calculate_cost(asset stake_net_quantity, asset stake_cpu_quantity);
+
+ public:
+  resource_exchange(account_name self)
+      : _contract(self),
+        eosio::contract(self),
+        accounts(_self, _self),
+        contract_state(_self, _self) {}
 
   struct withdraw_tx {
     account_name to;
     asset quantity;
   };
 
+  struct stake_trade {
+    account_name user;
+    asset net;
+    asset cpu;
+  };
+
   //@abi table account i64
   struct account {
     account(account_name o = account_name()) : owner(o) {}
     account_name owner;
-    asset balance;
-    uint32_t resource_net = 0;
-    uint32_t resource_cpu = 0;
+    asset balance = asset(0);
+    asset resource_net = asset(0);
+    asset resource_cpu = asset(0);
 
     bool is_empty() const {
-      return !(balance.amount | resource_net | resource_cpu);
+      return !(balance.amount | resource_net.amount | resource_cpu.amount);
     }
 
     uint64_t primary_key() const { return owner; }
@@ -38,6 +67,12 @@ public:
   void deposit(currency::transfer tx);
 
   /// @abi action
+  void buystake(account_name from, account_name to, asset net, asset cpu);
+
+  /// @abi action
+  void sellstake(account_name from, account_name to, asset net, asset cpu);
+
+  /// @abi action
   void withdraw(account_name to, asset quantity);
 };
-} // namespace eosio
+}  // namespace eosio
