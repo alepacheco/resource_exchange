@@ -1,0 +1,24 @@
+{
+  // See https://go.microsoft.com/fwlink/?LinkId=733558
+  // for the documentation about the tasks.json format
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build",
+      "group": "build",
+      "type": "shell",
+      "command":
+        "eosiocpp -o bin/resource_exchange/resource_exchange.wast resource_exchange.cpp && eosiocpp -g bin/resource_exchange/resource_exchange.abi resource_exchange.cpp",
+      "problemMatcher": []
+    },
+    {
+      "label": "deploy",
+      "type": "shell",
+      "command":
+        "cleos --wallet-url=http://localhost:8899/ -u http://localhost:8888/ set contract exchangedem2 ./bin/resource_exchange",
+      "problemMatcher": []
+    }
+  ]
+}
+
+
