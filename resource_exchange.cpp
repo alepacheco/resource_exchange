@@ -1,5 +1,4 @@
 #include "resource_exchange.hpp"
-#include <boost/container/flat_map.hpp>
 #include <cmath>
 #include <eosiolib/currency.hpp>
 #include <eosiolib/eosio.hpp>
@@ -8,7 +7,10 @@
 
 namespace eosio {
 void resource_exchange::apply(account_name contract, account_name act) {
-  // print("Running: ", name{contract}, " - ", name{act}, "\n");
+  if (!contract_state.exists()) {
+    contract_state.set(state{asset(0), asset(0)}, _self);
+  }
+
   switch (act) {
     case N(transfer): {
       auto tx = unpack_action_data<currency::transfer>();
@@ -22,6 +24,11 @@ void resource_exchange::apply(account_name contract, account_name act) {
       withdraw(tx.to, tx.quantity);
       break;
     }
+    case N(buystake): {
+      auto tx = unpack_action_data<stake_trade>();
+      buystake(tx.from, tx.to, tx.net, tx.cpu);
+      break;
+    }
   }
 }
 
@@ -32,17 +39,21 @@ void resource_exchange::deposit(currency::transfer tx) {
                "asset must be system token");
 
   auto itr = accounts.find(tx.from);
+  // Create new account if it doesn't exist
   if (itr == accounts.end()) {
     itr = accounts.emplace(_self, [&](auto& acnt) { acnt.owner = tx.from; });
   }
 
+  // Update account
   accounts.modify(itr, 0, [&](auto& acnt) { acnt.balance += tx.quantity; });
+
+  // Update contract state
+  auto _state = contract_state.get();
+  contract_state.set(
+      state{_state.liquid_funds + tx.quantity, _state.total_stacked}, _self);
 }
+
 void resource_exchange::withdraw(account_name to, asset quantity) {
-  // cleos set account permission {contract_name} active '{"threshold":
-  // 1,"keys": [{"key": "{key_for_permision}","weight": 1}],"accounts":
-  // [{"permission":{"actor":"{contract_name}","permission":"eosio.code"},"weight":1}]}'
-  // owner
   require_auth(to);
   eosio_assert(quantity.is_valid(), "invalid quantity");
   eosio_assert(quantity.amount > 0, "must withdraw positive quantity");
@@ -55,6 +66,11 @@ void resource_exchange::withdraw(account_name to, asset quantity) {
     acnt.balance -= quantity;
   });
 
+  // Update contract state
+  auto _state = contract_state.get();
+  contract_state.set(
+      state{_state.liquid_funds - quantity, _state.total_stacked}, _self);
+
   // TODO first unstake some tokens, 3days later send
   action(permission_level(_contract, N(active)), N(eosio.token), N(transfer),
          std::make_tuple(_contract, to, quantity, std::string("")))
@@ -65,20 +81,20 @@ void resource_exchange::withdraw(account_name to, asset quantity) {
   }
 }
 
+// FIXME
 void resource_exchange::delegatebw(account_name receiver,
                                    asset stake_net_quantity,
                                    asset stake_cpu_quantity) {
-  action(permission_level(_contract, N(active)), N(eosio.system), N(delegatebw),
+  action(permission_level(_contract, N(active)), N(eosio), N(delegatebw),
          std::make_tuple(_contract, receiver, stake_net_quantity,
                          stake_cpu_quantity))
       .send();
 }
-
+// FIXME
 void resource_exchange::undelegatebw(account_name receiver,
                                      asset stake_net_quantity,
                                      asset stake_cpu_quantity) {
-  action(permission_level(_contract, N(active)), N(eosio.system),
-         N(undelegatebw),
+  action(permission_level(_contract, N(active)), N(eosio), N(undelegatebw),
          std::make_tuple(_contract, receiver, stake_net_quantity,
                          stake_cpu_quantity))
       .send();
@@ -87,13 +103,12 @@ void resource_exchange::undelegatebw(account_name receiver,
 void resource_exchange::buystake(account_name from, account_name to, asset net,
                                  asset cpu) {
   // TODO
-  // enouth funds liguid to stake
-  //
   require_auth(from);
   eosio_assert(net.is_valid() && cpu.is_valid(), "invalid quantity");
 
   auto state = contract_state.get();
-  eosio_assert(state.liquid_funds >= (net + cpu), "not enough resources in exchange");
+  eosio_assert(state.liquid_funds >= (net + cpu),
+               "not enough resources in exchange");
   eosio_assert(net.symbol == asset().symbol && cpu.symbol == asset().symbol,
                "asset must be system token");
 
@@ -102,7 +117,6 @@ void resource_exchange::buystake(account_name from, account_name to, asset net,
   // calculate cost based on supply
   int64_t cost = calculate_cost(net, cpu);
   eosio_assert(itr->balance.amount >= cost, "not enough funds on account");
-
   // TODO do this on the next cycle
   // deduce account
   accounts.modify(itr, 0, [&](auto& acnt) { acnt.balance.amount -= cost; });
@@ -124,7 +138,8 @@ int64_t resource_exchange::calculate_cost(asset stake_net_quantity,
   int64_t cost_per_token =
       -1 / (state.liquid_funds.amount -
             state.get_total().amount * 2);  // TODO find optimal function
-  return cost_per_token * (stake_net_quantity.amount + stake_cpu_quantity.amount);
+  return cost_per_token *
+         (stake_net_quantity.amount + stake_cpu_quantity.amount);
 }
 }  // namespace eosio
 

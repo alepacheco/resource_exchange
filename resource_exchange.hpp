@@ -8,17 +8,6 @@ class resource_exchange : public eosio::contract {
  private:
   account_name _contract;
 
-  //@abi table state i64
-  struct state {
-    asset liquid_funds = asset(0);
-    asset total_stacked = asset(0);
-    asset get_total() const { return liquid_funds + total_stacked; }
-    EOSLIB_SERIALIZE(state, (liquid_funds)(total_stacked))
-  };
-
-  typedef singleton<N(state), state> state_index;
-  state_index contract_state;
-
   void delegatebw(account_name receiver, asset stake_net_quantity,
                   asset stake_cpu_quantity);
   void undelegatebw(account_name receiver, asset stake_net_quantity,
@@ -33,13 +22,22 @@ class resource_exchange : public eosio::contract {
         accounts(_self, _self),
         contract_state(_self, _self) {}
 
+  //@abi table state i64
+  struct state {
+    asset liquid_funds;
+    asset total_stacked;
+    asset get_total() const { return liquid_funds + total_stacked; }
+    EOSLIB_SERIALIZE(state, (liquid_funds)(total_stacked))
+  };
+
   struct withdraw_tx {
     account_name to;
     asset quantity;
   };
 
   struct stake_trade {
-    account_name user;
+    account_name from;
+    account_name to;
     asset net;
     asset cpu;
   };
@@ -59,6 +57,9 @@ class resource_exchange : public eosio::contract {
     uint64_t primary_key() const { return owner; }
     EOSLIB_SERIALIZE(account, (owner)(balance)(resource_net)(resource_cpu))
   };
+
+  typedef singleton<N(state), state> state_index;
+  state_index contract_state;
 
   typedef eosio::multi_index<N(account), account> account_index;
   account_index accounts;
