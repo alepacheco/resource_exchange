@@ -10,6 +10,7 @@
       "problemMatcher": []
     },
     {
+<<<<<<< HEAD
       "label": "create build folder",
       "type": "shell",
       "command":
@@ -17,6 +18,8 @@
       "problemMatcher": []
     },
     {
+=======
+>>>>>>> ba4a0e583e535e25711f0e01b1033f11d9664680
       "label": "deploy",
       "type": "shell",
       "command": "cleos --wallet-url=http://localhost:8899/ -u http://localhost:8888/ set contract exchangedem3 ./bin/resource_exchange",
