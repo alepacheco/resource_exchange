@@ -13,7 +13,7 @@ class resource_exchange : public eosio::contract {
   void undelegatebw(account_name receiver, asset stake_net_quantity,
                     asset stake_cpu_quantity);
 
-  int64_t calculate_cost(asset stake_net_quantity, asset stake_cpu_quantity);
+  asset calculate_cost(asset stake_net_quantity, asset stake_cpu_quantity);
 
  public:
   resource_exchange(account_name self)

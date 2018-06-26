@@ -81,7 +81,6 @@ void resource_exchange::withdraw(account_name to, asset quantity) {
   }
 }
 
-// FIXME
 void resource_exchange::delegatebw(account_name receiver,
                                    asset stake_net_quantity,
                                    asset stake_cpu_quantity) {
@@ -90,7 +89,6 @@ void resource_exchange::delegatebw(account_name receiver,
                          stake_cpu_quantity, false))
       .send();
 }
-// FIXME
 void resource_exchange::undelegatebw(account_name receiver,
                                      asset stake_net_quantity,
                                      asset stake_cpu_quantity) {
@@ -115,13 +113,24 @@ void resource_exchange::buystake(account_name from, account_name to, asset net,
   auto itr = accounts.find(from);
   eosio_assert(itr != accounts.end(), "account not found");
   // calculate cost based on supply
-  int64_t cost = calculate_cost(net, cpu);
-  eosio_assert(itr->balance.amount >= cost, "not enough funds on account");
+  asset cost = calculate_cost(net, cpu);
+  print("Buying: ", net + cpu, " in stake for: ", cost, "\n");
+  eosio_assert(itr->balance >= cost, "not enough funds on account");
   // TODO do this on the next cycle
   // deduce account
-  accounts.modify(itr, 0, [&](auto& acnt) { acnt.balance.amount -= cost; });
+  accounts.modify(itr, 0, [&](auto& acnt) {
+    acnt.balance -= cost;
+    acnt.resource_net += net;
+    acnt.resource_cpu += cpu;
+  });
   // delegate resources
   delegatebw(to, net, cpu);
+
+  // update state
+  contract_state.set(
+      resource_exchange::state{state.liquid_funds - (net + cpu),
+                               state.total_stacked + (net + cpu)},
+      _self);
 }
 
 void resource_exchange::sellstake(account_name from, account_name to, asset net,
@@ -129,17 +138,18 @@ void resource_exchange::sellstake(account_name from, account_name to, asset net,
   // TODO
 }
 
-int64_t resource_exchange::calculate_cost(asset stake_net_quantity,
-                                          asset stake_cpu_quantity) {
+asset resource_exchange::calculate_cost(asset stake_net_quantity,
+                                        asset stake_cpu_quantity) {
   eosio_assert(contract_state.exists(), "No contract state available");
   auto state = contract_state.get();
 
-  // TO do, trottle curve
-  int64_t cost_per_token =
-      -1 / (state.liquid_funds.amount -
-            state.get_total().amount * 2);  // TODO find optimal function
-  return cost_per_token *
-         (stake_net_quantity.amount + stake_cpu_quantity.amount);
+  uint64_t purchase = stake_net_quantity.amount + stake_cpu_quantity.amount;
+  double_t liquid = state.liquid_funds.amount;
+  double_t total = state.get_total().amount;
+  double_t cost_per_token =
+      ((total * total / liquid) / (total * 10));  // TODO find optimal function
+
+  return asset(cost_per_token * purchase);
 }
 }  // namespace eosio
 
