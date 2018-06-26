@@ -87,11 +87,7 @@ void resource_exchange::delegatebw(account_name receiver,
                                    asset stake_cpu_quantity) {
   action(permission_level(_contract, N(active)), N(eosio), N(delegatebw),
          std::make_tuple(_contract, receiver, stake_net_quantity,
-<<<<<<< HEAD
                          stake_cpu_quantity, false))
-=======
-                         stake_cpu_quantity))
->>>>>>> ba4a0e583e535e25711f0e01b1033f11d9664680
       .send();
 }
 // FIXME
