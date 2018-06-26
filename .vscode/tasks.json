@@ -10,6 +10,13 @@
       "problemMatcher": []
     },
     {
+      "label": "create build folder",
+      "type": "shell",
+      "command":
+        "mkdir -p bin/resource_exchange",
+      "problemMatcher": []
+    },
+    {
       "label": "deploy",
       "type": "shell",
       "command": "cleos --wallet-url=http://localhost:8899/ -u http://localhost:8888/ set contract exchangedem3 ./bin/resource_exchange",
