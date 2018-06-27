@@ -13,8 +13,6 @@ class resource_exchange : public eosio::contract {
   void undelegatebw(account_name receiver, asset stake_net_quantity,
                     asset stake_cpu_quantity);
 
-  asset calculate_cost(asset stake_net_quantity, asset stake_cpu_quantity);
-
  public:
   resource_exchange(account_name self)
       : _contract(self),
@@ -75,5 +73,8 @@ class resource_exchange : public eosio::contract {
 
   /// @abi action
   void withdraw(account_name to, asset quantity);
+
+  /// @abi action
+  asset calcost(asset res);
 };
 }  // namespace eosio
