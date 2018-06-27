@@ -8,7 +8,7 @@
 namespace eosio {
 void resource_exchange::apply(account_name contract, account_name act) {
   if (!contract_state.exists()) {
-    contract_state.set(state{asset(0), asset(0)}, _self);
+    contract_state.set(state_t{asset(0), asset(0)}, _self);
   }
 
   switch (act) {
@@ -28,7 +28,7 @@ void resource_exchange::apply(account_name contract, account_name act) {
     }
     case N(buystake): {
       auto tx = unpack_action_data<stake_trade>();
-      buystake(tx.from, tx.to, tx.net, tx.cpu);
+      buystake(tx.from, tx.net, tx.cpu);
       break;
     }
     case N(calcost): {
@@ -55,9 +55,9 @@ void resource_exchange::deposit(currency::transfer tx) {
   accounts.modify(itr, 0, [&](auto& acnt) { acnt.balance += tx.quantity; });
 
   // Update contract state
-  auto _state = contract_state.get();
+  auto state = contract_state.get();
   contract_state.set(
-      state{_state.liquid_funds + tx.quantity, _state.total_stacked}, _self);
+      state_t{state.liquid_funds + tx.quantity, state.total_stacked}, _self);
 }
 
 void resource_exchange::withdraw(account_name to, asset quantity) {
@@ -74,9 +74,9 @@ void resource_exchange::withdraw(account_name to, asset quantity) {
   });
 
   // Update contract state
-  auto _state = contract_state.get();
+  auto state = contract_state.get();
   contract_state.set(
-      state{_state.liquid_funds - quantity, _state.total_stacked}, _self);
+      state_t{state.liquid_funds - quantity, state.total_stacked}, _self);
 
   // TODO first unstake some tokens, 3days later send
   action(permission_level(_contract, N(active)), N(eosio.token), N(transfer),
@@ -105,45 +105,123 @@ void resource_exchange::undelegatebw(account_name receiver,
       .send();
 }
 
-void resource_exchange::buystake(account_name from, account_name to, asset net,
-                                 asset cpu) {
-  // TODO
+void resource_exchange::buystake(account_name from, asset net, asset cpu) {
   require_auth(from);
   eosio_assert(net.is_valid() && cpu.is_valid(), "invalid quantity");
-
-  auto state = contract_state.get();
-  eosio_assert(state.liquid_funds >= (net + cpu),
-               "not enough resources in exchange");
   eosio_assert(net.symbol == asset().symbol && cpu.symbol == asset().symbol,
                "asset must be system token");
 
   auto itr = accounts.find(from);
   eosio_assert(itr != accounts.end(), "account not found");
-  // calculate cost based on supply
-  asset cost = calcost(net + cpu);
-  print("Buying: ", net + cpu, " in stake for: ", cost, "\n");
-  eosio_assert(itr->balance >= cost, "not enough funds on account");
 
-  // TODO do this on the next cycle
-  // deduce account
-  accounts.modify(itr, 0, [&](auto& acnt) {
-    acnt.balance -= cost;
-    acnt.resource_net += net;
-    acnt.resource_cpu += cpu;
+  auto pending_itr = pendingtxs.find(from);
+  if (pending_itr == pendingtxs.end()) {
+    pending_itr = pendingtxs.emplace(from, [&](auto& tx) {
+      tx.user = from;
+      tx.net = asset(0);
+      tx.cpu = asset(0);
+      tx.withdrawing = asset(0);
+    });
+  }
+
+  asset adj_net = net + pending_itr->net;
+  asset adj_cpu = cpu + pending_itr->cpu;
+
+  auto state = contract_state.get();
+  eosio_assert(state.liquid_funds >= (adj_net + adj_cpu),
+               "not enough resources in exchange");
+
+  asset cost = calcost(adj_net + adj_cpu);
+  eosio_assert((itr->balance - pending_itr->withdrawing) >= cost,
+               "not enough funds on account");
+
+  print("Queing purchase of: ", net + cpu, " in stake for*: ", cost, "\n");
+  pendingtxs.modify(pending_itr, 0, [&](auto& tx) {
+    tx.net = adj_net;
+    tx.cpu = adj_cpu;
   });
-  // delegate resources
-  delegatebw(to, net, cpu);
 
-  // update state
-  contract_state.set(
-      resource_exchange::state{state.liquid_funds - (net + cpu),
-                               state.total_stacked + (net + cpu)},
-      _self);
+  // TODO (reset if then fails) #dobuystake
+  contract_state.set(state_t{state.liquid_funds - (net + cpu),
+                             state.total_stacked + (net + cpu)},
+                     _self);
 }
 
-void resource_exchange::sellstake(account_name from, account_name to, asset net,
-                                  asset cpu) {
-  // TODO
+void resource_exchange::dobuystake(account_name user, asset net, asset cpu) {
+  // auto itr = accounts.find(from);
+  // eosio_assert(itr != accounts.end(), "account not found");
+
+  // asset cost = calcost(net + cpu);
+  // if (itr->balance >= cost) {
+  //   print("Buying: ", net + cpu, " in stake for: ", cost, "\n");
+  //   // deduce account
+  //   accounts.modify(itr, 0, [&](auto& acnt) {
+  //     acnt.balance -= cost;
+  //     acnt.resource_net += net;
+  //     acnt.resource_cpu += cpu;
+  //   });
+  //   // delegate resources
+  //   delegatebw(to, net, cpu);
+  // } else {
+  // }
+
+  // if no cash, remove state staked
+}
+
+void resource_exchange::sellstake(account_name user, asset net, asset cpu) {
+  // to sell reduce account resources, in next cycle he will pay the new usage
+  require_auth(user);
+  eosio_assert(net.is_valid() && cpu.is_valid(), "invalid quantity");
+  eosio_assert(net.symbol == asset().symbol && cpu.symbol == asset().symbol,
+               "asset must be system token");
+
+  auto itr = accounts.find(user);
+  auto pending_itr = pendingtxs.find(user);
+  eosio_assert(itr != accounts.end(), "unknown account");
+  asset usr_cpu = itr->resource_cpu;
+  asset usr_net = itr->resource_net;
+
+  if (pending_itr != pendingtxs.end()) {
+    usr_cpu += pending_itr->cpu;
+    usr_net += pending_itr->net;
+  }
+
+  eosio_assert(usr_cpu >= cpu && usr_net >= net && (net + cpu) > asset(0),
+               "not enought to sell");
+
+  // reduce first in tx then in account
+  if (pending_itr == pendingtxs.end()) {
+    accounts.modify(itr, 0, [&](auto& acnt) {
+      acnt.resource_net -= usr_net;
+      acnt.resource_cpu -= usr_cpu;
+    });
+  } else {
+    auto amount_tx_net = pending_itr->net - net;
+    auto amount_tx_cpu = pending_itr->cpu - cpu;
+
+    if (amount_tx_cpu >= asset(0)) {  // if enought to cover with tx
+      pendingtxs.modify(pending_itr, 0,
+                        [&](auto& tx) { tx.cpu -= amount_tx_cpu; });
+    } else {  // split with tx and account
+      pendingtxs.modify(pending_itr, 0, [&](auto& tx) { tx.cpu = asset(0); });
+      accounts.modify(itr, 0,
+                      [&](auto& acnt) { acnt.resource_cpu += amount_tx_cpu; });
+    }
+
+    if (amount_tx_net >= asset(0)) {
+      pendingtxs.modify(pending_itr, 0,
+                        [&](auto& tx) { tx.net -= amount_tx_net; });
+    } else {
+      pendingtxs.modify(pending_itr, 0, [&](auto& tx) { tx.net = asset(0); });
+      accounts.modify(itr, 0,
+                      [&](auto& acnt) { acnt.resource_net += amount_tx_net; });
+    }
+  }
+
+  auto state = contract_state.get();
+  contract_state.set(state_t{state.liquid_funds + (net + cpu),
+                             state.total_stacked - (net + cpu)},
+                     _self);
 }
 
 void resource_exchange::cycle() {
