@@ -8,24 +8,27 @@ class resource_exchange : public eosio::contract {
  private:
   account_name _contract;
 
-  void delegatebw(account_name receiver, asset stake_net_quantity,
-                  asset stake_cpu_quantity);
-  void undelegatebw(account_name receiver, asset stake_net_quantity,
-                    asset stake_cpu_quantity);
-
-  void dobuystake(account_name user, asset net, asset cpu);
-
- public:
-  resource_exchange(account_name self)
-      : _contract(self),
-        eosio::contract(self),
-        accounts(_self, _self),
-        pendingtxs(_self, _self),
-        contract_state(_self, _self) {}
+  struct stake_trade {
+    account_name user;
+    asset net;
+    asset cpu;
+  };
 
   struct withdraw_tx {
     account_name user;
     asset quantity;
+  };
+
+  //@abi table pendingtx i64
+  struct pendingtx {
+    pendingtx(account_name o = account_name()) : user(o) {}
+    account_name user;
+    asset net;
+    asset cpu;
+    asset get_all() const { return cpu + net; }
+
+    uint64_t primary_key() const { return user; }
+    EOSLIB_SERIALIZE(pendingtx, (user)(net)(cpu))
   };
 
   //@abi table state i64
@@ -36,60 +39,62 @@ class resource_exchange : public eosio::contract {
     EOSLIB_SERIALIZE(state_t, (liquid_funds)(total_stacked))
   };
 
-  struct stake_trade {
-    account_name user;
-    asset net;
-    asset cpu;
-  };
-
   //@abi table account i64
-  struct account {
-    account(account_name o = account_name()) : owner(o) {}
+  struct account_t {
+    account_t(account_name o = account_name()) : owner(o) {}
     account_name owner;
     asset balance = asset(0);
     asset resource_net = asset(0);
     asset resource_cpu = asset(0);
+    asset get_all() const { return resource_cpu + resource_net; }
 
     bool is_empty() const {
       return !(balance.amount | resource_net.amount | resource_cpu.amount);
     }
 
     uint64_t primary_key() const { return owner; }
-    EOSLIB_SERIALIZE(account, (owner)(balance)(resource_net)(resource_cpu))
+    EOSLIB_SERIALIZE(account_t, (owner)(balance)(resource_net)(resource_cpu))
   };
 
-  //@abi table pendingtx i64
-  struct pendingtx {
-    pendingtx(account_name o = account_name()) : user(o) {}
-    account_name user;
-    asset net;
-    asset cpu;
-    asset withdrawing;  // positive mumber, but withdrawing
-
-    uint64_t primary_key() const { return user; }
-    EOSLIB_SERIALIZE(pendingtx, (user)(net)(cpu)(withdrawing))
+  // FIXME import this
+  struct delegated_bandwidth {
+    account_name from;
+    account_name to;
+    asset net_weight;
+    asset cpu_weight;
+    uint64_t primary_key() const { return to; }
+    EOSLIB_SERIALIZE(delegated_bandwidth, (from)(to)(net_weight)(cpu_weight))
   };
+  // FIXME import this
+  typedef eosio::multi_index<N(delband), delegated_bandwidth>
+      del_bandwidth_table;
 
-  typedef singleton<N(state_t), state_t> state_index;
+  typedef singleton<N(state), state_t> state_index;
   state_index contract_state;
 
-  typedef eosio::multi_index<N(account), account> account_index;
+  typedef eosio::multi_index<N(account), account_t> account_index;
   account_index accounts;
 
   typedef eosio::multi_index<N(pendingtx), pendingtx> pendingtx_index;
   pendingtx_index pendingtxs;
 
-  // FIXME import this
-  struct delegated_bandwidth {
-      account_name  from;
-      account_name  to;
-      asset         net_weight;
-      asset         cpu_weight;
-      uint64_t  primary_key()const { return to; }
-      EOSLIB_SERIALIZE( delegated_bandwidth, (from)(to)(net_weight)(cpu_weight) )
-   };
-  // FIXME import this
-  typedef eosio::multi_index< N(delband), delegated_bandwidth> del_bandwidth_table;
+  void delegatebw(account_name receiver, asset stake_net_quantity,
+                  asset stake_cpu_quantity);
+  void undelegatebw(account_name receiver, asset stake_net_quantity,
+                    asset stake_cpu_quantity);
+
+  void dobuystake(account_name user, asset net, asset cpu);
+
+  void reset_delayed_tx(pendingtx tx);
+  void billaccount(account_name account, double cost_per_token);
+
+ public:
+  resource_exchange(account_name self)
+      : _contract(self),
+        eosio::contract(self),
+        accounts(_self, _self),
+        pendingtxs(_self, _self),
+        contract_state(_self, _self) {}
 
   void apply(account_name contract, account_name act);
   void deposit(currency::transfer tx);
@@ -105,6 +110,9 @@ class resource_exchange : public eosio::contract {
 
   /// @abi action
   asset calcost(asset res);
+
+  /// @abi action
+  double calcosttoken();
 
   /// @abi action
   void cycle();

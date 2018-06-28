@@ -36,6 +36,15 @@ void resource_exchange::apply(account_name contract, account_name act) {
       calcost(tx);
       break;
     }
+    case N(calcosttoken): {
+      calcosttoken();
+      break;
+    }
+    case N(cycle): {
+      // TODO requiere auth..
+      cycle();
+      break;
+    }
   }
 }
 
@@ -78,7 +87,6 @@ void resource_exchange::withdraw(account_name to, asset quantity) {
   contract_state.set(
       state_t{state.liquid_funds - quantity, state.total_stacked}, _self);
 
-  // TODO first unstake some tokens, 3days later send
   action(permission_level(_contract, N(active)), N(eosio.token), N(transfer),
          std::make_tuple(_contract, to, quantity, std::string("")))
       .send();
@@ -120,7 +128,6 @@ void resource_exchange::buystake(account_name from, asset net, asset cpu) {
       tx.user = from;
       tx.net = asset(0);
       tx.cpu = asset(0);
-      tx.withdrawing = asset(0);
     });
   }
 
@@ -132,10 +139,10 @@ void resource_exchange::buystake(account_name from, asset net, asset cpu) {
                "not enough resources in exchange");
 
   asset cost = calcost(adj_net + adj_cpu);
-  eosio_assert((itr->balance - pending_itr->withdrawing) >= cost,
-               "not enough funds on account");
+  eosio_assert(itr->balance >= cost, "not enough funds on account");
 
-  print("Queing purchase of: ", net, " and ", cpu, " in stake for*: ", cost, "\n");
+  print("Queing purchase of: ", net, " and ", cpu, " in stake for*: ", cost,
+        "\n");
   pendingtxs.modify(pending_itr, 0, [&](auto& tx) {
     tx.net = adj_net;
     tx.cpu = adj_cpu;
@@ -146,7 +153,6 @@ void resource_exchange::buystake(account_name from, asset net, asset cpu) {
                              state.total_stacked + (net + cpu)},
                      _self);
 }
-
 
 void resource_exchange::sellstake(account_name user, asset net, asset cpu) {
   // to sell reduce account resources, in next cycle he will pay the new usage
@@ -205,7 +211,8 @@ void resource_exchange::sellstake(account_name user, asset net, asset cpu) {
 }
 
 void resource_exchange::dobuystake(account_name user, asset net, asset cpu) {
-  // iter over accounts, compare with output of system listbw and modify accordinly 
+  // iter over accounts, compare with output of system listbw and modify
+  // accordinly
 
   // auto itr = accounts.find(from);
   // eosio_assert(itr != accounts.end(), "account not found");
@@ -227,23 +234,84 @@ void resource_exchange::dobuystake(account_name user, asset net, asset cpu) {
   // if no cash, remove state staked
 }
 
-
+void resource_exchange::reset_delayed_tx(pendingtx tx) {
+  // recover old state
+}
 void resource_exchange::cycle() {
-  // TODO 
-  // get listbw 
-  // cleos get table eosio {contract_name} delband
-  del_bandwidth_table dw_table(N(eosio), _self); // TODO test this
+  // TODO
+  del_bandwidth_table dw_table(N(eosio), _self);
 
-  // itirate over accounts, check matching resources, else delegate undelegate
-  for(auto acnt = accounts.begin(); acnt != accounts.end(); ++acnt) {
-    
+  // itirate over accounts, check matching resources, else delegate
+  // undelegate
+
+  // bill account and then match real delegation
+  auto cost_per_token = calcosttoken();
+  for (auto acnt = accounts.begin(); acnt != accounts.end(); ++acnt) {
+    print("account: ", name{acnt->owner}, "\n");
+    billaccount(acnt->owner, cost_per_token);
+    // now check with delegate_table and do changes to match
   }
 
-  // itirate over pending orders, fill them and modify accounts 
   // pay hodlers
 }
 
+void resource_exchange::billaccount(account_name owner, double cost_per_token) {
+  auto acnt = accounts.find(owner);
+  auto pending_itr = pendingtxs.find(acnt->owner);
+
+  auto cost_all = asset(cost_per_token * acnt->get_all().amount);
+  asset extra_net = asset(0);
+  asset extra_cpu = asset(0);
+  //print("all: ", cost_all.amount, " ", cost_per_token);
+
+  if (pending_itr != pendingtxs.end()) {
+    //print("pending: ", pending_itr->get_all().amount);
+    cost_all += asset(cost_per_token * pending_itr->get_all().amount);
+    extra_net += pending_itr->net;
+    extra_cpu += pending_itr->cpu;
+  }
+  eosio_assert(cost_all.amount >= 0, "cost negative");
+  print("cost: ", cost_all, "\n");
+  if (acnt->balance >= cost_all) {
+    // has cash, buy
+    print("buyin all\n");
+    accounts.modify(acnt, 0, [&](auto& account) {
+      account.balance -= cost_all;
+      account.resource_net += extra_net;
+      account.resource_cpu += extra_cpu;
+    });
+  } else {
+    // no cash, cancel tx, try pay for account only
+    reset_delayed_tx(*pending_itr); // reset stake change of tx
+    asset cost_account = calcost(acnt->get_all());
+    if (acnt->balance >= cost_account) {
+      // pay for account
+      accounts.modify(acnt, 0,
+                      [&](auto& account) { account.balance -= cost_account; });
+    } else {
+      // no cash: reset account
+      auto state = contract_state.get();
+      contract_state.set(
+          state_t{
+              state.liquid_funds + (acnt->resource_net + acnt->resource_cpu),
+              state.total_stacked - (acnt->resource_net + acnt->resource_cpu)},
+          _self);
+      accounts.modify(acnt, 0, [&](auto& account) {
+        account.resource_net = asset(0);
+        account.resource_cpu = asset(0);
+      });
+    }
+  }
+  // delete tx
+  if (pending_itr != pendingtxs.end()) {
+    pendingtxs.erase(pending_itr);
+  }
+}
+
 asset resource_exchange::calcost(asset resources) {
+  if (resources <= asset(0)) {
+    return asset(0);
+  }
   eosio_assert(contract_state.exists(), "No contract state available");
   int PURCHASE_STEP = 10000;  // the lower the more persice but more cpu
   int PRICE_TUNE = 100;
@@ -266,6 +334,18 @@ asset resource_exchange::calcost(asset resources) {
   asset price = asset(cost_per_token * purchase);
   print("price: ", price, "\n");
   return price;
+}
+
+double resource_exchange::calcosttoken() {
+  eosio_assert(contract_state.exists(), "No contract state available");
+  int PRICE_TUNE = 100;
+  auto state = contract_state.get();
+  double liquid = state.liquid_funds.amount;
+  double total = state.get_total().amount;
+  double cost_per_token = ((total * total / liquid) / (total * PRICE_TUNE));  // TODO find optimal function
+
+  print("price token: ", asset(cost_per_token * 10000), "\n");
+  return cost_per_token;
 }
 }  // namespace eosio
 
