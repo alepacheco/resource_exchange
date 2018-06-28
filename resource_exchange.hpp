@@ -79,6 +79,18 @@ class resource_exchange : public eosio::contract {
   typedef eosio::multi_index<N(pendingtx), pendingtx> pendingtx_index;
   pendingtx_index pendingtxs;
 
+  // FIXME import this
+  struct delegated_bandwidth {
+      account_name  from;
+      account_name  to;
+      asset         net_weight;
+      asset         cpu_weight;
+      uint64_t  primary_key()const { return to; }
+      EOSLIB_SERIALIZE( delegated_bandwidth, (from)(to)(net_weight)(cpu_weight) )
+   };
+  // FIXME import this
+  typedef eosio::multi_index< N(delband), delegated_bandwidth> del_bandwidth_table;
+
   void apply(account_name contract, account_name act);
   void deposit(currency::transfer tx);
 

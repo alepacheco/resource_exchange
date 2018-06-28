@@ -232,6 +232,8 @@ void resource_exchange::cycle() {
   // TODO 
   // get listbw 
   // cleos get table eosio {contract_name} delband
+  del_bandwidth_table dw_table(N(eosio), _self); // TODO test this
+
   // itirate over accounts, check matching resources, else delegate undelegate
   for(auto acnt = accounts.begin(); acnt != accounts.end(); ++acnt) {
     
