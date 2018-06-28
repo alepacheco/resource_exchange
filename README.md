@@ -13,4 +13,12 @@
 - Generation of income from leasing
 
 
+## Actions: 
+ - deposit *(automatic when doing a transfer to contract)
+ - withdraw: get fund out from exchange
+ - buystake: stake net and cpu to your account
+ - sellstake: cancel or reduce stake consumption
+ 
+
+
 > For any question ask: @alepacheco on telegram

@@ -147,28 +147,6 @@ void resource_exchange::buystake(account_name from, asset net, asset cpu) {
                      _self);
 }
 
-void resource_exchange::dobuystake(account_name user, asset net, asset cpu) {
-  // iter over accounts, compare with output of system listbw and modify accordinly 
-
-  // auto itr = accounts.find(from);
-  // eosio_assert(itr != accounts.end(), "account not found");
-
-  // asset cost = calcost(net + cpu);
-  // if (itr->balance >= cost) {
-  //   print("Buying: ", net + cpu, " in stake for: ", cost, "\n");
-  //   // deduce account
-  //   accounts.modify(itr, 0, [&](auto& acnt) {
-  //     acnt.balance -= cost;
-  //     acnt.resource_net += net;
-  //     acnt.resource_cpu += cpu;
-  //   });
-  //   // delegate resources
-  //   delegatebw(to, net, cpu);
-  // } else {
-  // }
-
-  // if no cash, remove state staked
-}
 
 void resource_exchange::sellstake(account_name user, asset net, asset cpu) {
   // to sell reduce account resources, in next cycle he will pay the new usage
@@ -226,15 +204,43 @@ void resource_exchange::sellstake(account_name user, asset net, asset cpu) {
                      _self);
 }
 
+void resource_exchange::dobuystake(account_name user, asset net, asset cpu) {
+  // iter over accounts, compare with output of system listbw and modify accordinly 
+
+  // auto itr = accounts.find(from);
+  // eosio_assert(itr != accounts.end(), "account not found");
+
+  // asset cost = calcost(net + cpu);
+  // if (itr->balance >= cost) {
+  //   print("Buying: ", net + cpu, " in stake for: ", cost, "\n");
+  //   // deduce account
+  //   accounts.modify(itr, 0, [&](auto& acnt) {
+  //     acnt.balance -= cost;
+  //     acnt.resource_net += net;
+  //     acnt.resource_cpu += cpu;
+  //   });
+  //   // delegate resources
+  //   delegatebw(to, net, cpu);
+  // } else {
+  // }
+
+  // if no cash, remove state staked
+}
+
+
 void resource_exchange::cycle() {
-  // TODO
-  // remove sold stake from users (deduce, undelegate)
-  // finish stake purchase orders (deduce, delegate)
-  // bill accounts with stake
+  // TODO 
+  // get listbw 
+  // cleos get table eosio {contract_name} delband
+  // itirate over accounts, check matching resources, else delegate undelegate
+  for(auto acnt = accounts.begin(); acnt != accounts.end(); ++acnt) {
+    
+  }
+
+  // itirate over pending orders, fill them and modify accounts 
   // pay hodlers
 }
 
-// TODO find optimal function
 asset resource_exchange::calcost(asset resources) {
   eosio_assert(contract_state.exists(), "No contract state available");
   int PURCHASE_STEP = 10000;  // the lower the more persice but more cpu
