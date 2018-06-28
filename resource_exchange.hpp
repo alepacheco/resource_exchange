@@ -24,7 +24,7 @@ class resource_exchange : public eosio::contract {
         contract_state(_self, _self) {}
 
   struct withdraw_tx {
-    account_name to;
+    account_name user;
     asset quantity;
   };
 
@@ -37,8 +37,7 @@ class resource_exchange : public eosio::contract {
   };
 
   struct stake_trade {
-    account_name from;
-    account_name to;
+    account_name user;
     asset net;
     asset cpu;
   };

@@ -23,12 +23,12 @@ void resource_exchange::apply(account_name contract, account_name act) {
     }
     case N(withdraw): {
       auto tx = unpack_action_data<withdraw_tx>();
-      withdraw(tx.to, tx.quantity);
+      withdraw(tx.user, tx.quantity);
       break;
     }
     case N(buystake): {
       auto tx = unpack_action_data<stake_trade>();
-      buystake(tx.from, tx.net, tx.cpu);
+      buystake(tx.user, tx.net, tx.cpu);
       break;
     }
     case N(calcost): {
@@ -135,7 +135,7 @@ void resource_exchange::buystake(account_name from, asset net, asset cpu) {
   eosio_assert((itr->balance - pending_itr->withdrawing) >= cost,
                "not enough funds on account");
 
-  print("Queing purchase of: ", net + cpu, " in stake for*: ", cost, "\n");
+  print("Queing purchase of: ", net, " and ", cpu, " in stake for*: ", cost, "\n");
   pendingtxs.modify(pending_itr, 0, [&](auto& tx) {
     tx.net = adj_net;
     tx.cpu = adj_cpu;
@@ -148,6 +148,8 @@ void resource_exchange::buystake(account_name from, asset net, asset cpu) {
 }
 
 void resource_exchange::dobuystake(account_name user, asset net, asset cpu) {
+  // iter over accounts, compare with output of system listbw and modify accordinly 
+
   // auto itr = accounts.find(from);
   // eosio_assert(itr != accounts.end(), "account not found");
 
@@ -238,13 +240,13 @@ asset resource_exchange::calcost(asset resources) {
   int PURCHASE_STEP = 10000;  // the lower the more persice but more cpu
   int PRICE_TUNE = 100;
   auto state = contract_state.get();
-  uint64_t purchase = resources.amount;
+  int64_t purchase = resources.amount;
   double_t liquid = state.liquid_funds.amount;
   double_t total = state.get_total().amount;
 
   // purchases of 1 EOS at a time, to get fair price as the resources get
   // scarcer
-  uint32_t steps = purchase / PURCHASE_STEP;
+  int32_t steps = purchase / PURCHASE_STEP;
   double_t cost_per_token = 0;
   for (int i = 0; i < steps; i++) {
     cost_per_token += ((total * total / liquid) /
