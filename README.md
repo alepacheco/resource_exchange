@@ -3,6 +3,9 @@
 ### The aim of this contract is to create a self regulated market for CPU and Bandwidth on the eos blockchain
 
 > This contract is under development
+> TODO:
+- [ ] Check for security issues
+- [ ] Check for performance issues
 
 ##### This contract allows:
 - Leasing of EOS

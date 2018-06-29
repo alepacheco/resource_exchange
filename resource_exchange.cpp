@@ -3,6 +3,8 @@
 #include <eosiolib/currency.hpp>
 #include <eosiolib/eosio.hpp>
 #include <eosiolib/print.hpp>
+#include <eosiolib/time.hpp>
+#include <eosiolib/transaction.hpp>
 #include <eosiolib/types.hpp>
 
 namespace eosio {
@@ -17,18 +19,27 @@ void resource_exchange::apply(account_name contract, account_name act) {
                    "invalid contract, use eosio.token");
       auto tx = unpack_action_data<currency::transfer>();
       if (tx.from != _contract) {
+        require_auth(tx.from);
         deposit(tx);
       }
       break;
     }
     case N(withdraw): {
       auto tx = unpack_action_data<withdraw_tx>();
+      require_auth(tx.user);
       withdraw(tx.user, tx.quantity);
       break;
     }
     case N(buystake): {
       auto tx = unpack_action_data<stake_trade>();
+      require_auth(tx.user);
       buystake(tx.user, tx.net, tx.cpu);
+      break;
+    }
+    case N(sellstake): {
+      auto tx = unpack_action_data<stake_trade>();
+      require_auth(tx.user);
+      sellstake(tx.user, tx.net, tx.cpu);
       break;
     }
     case N(calcost): {
@@ -49,7 +60,6 @@ void resource_exchange::apply(account_name contract, account_name act) {
 }
 
 void resource_exchange::deposit(currency::transfer tx) {
-  require_auth(tx.from);
   eosio_assert(tx.quantity.is_valid(), "invalid quantity");
   eosio_assert(tx.quantity.symbol == asset().symbol,
                "asset must be system token");
@@ -70,7 +80,6 @@ void resource_exchange::deposit(currency::transfer tx) {
 }
 
 void resource_exchange::withdraw(account_name to, asset quantity) {
-  require_auth(to);
   eosio_assert(quantity.is_valid(), "invalid quantity");
   eosio_assert(quantity.amount > 0, "must withdraw positive quantity");
 
@@ -114,7 +123,6 @@ void resource_exchange::undelegatebw(account_name receiver,
 }
 
 void resource_exchange::buystake(account_name from, asset net, asset cpu) {
-  require_auth(from);
   eosio_assert(net.is_valid() && cpu.is_valid(), "invalid quantity");
   eosio_assert(net.symbol == asset().symbol && cpu.symbol == asset().symbol,
                "asset must be system token");
@@ -157,7 +165,6 @@ void resource_exchange::buystake(account_name from, asset net, asset cpu) {
 
 void resource_exchange::sellstake(account_name user, asset net, asset cpu) {
   // to sell reduce account resources, in next cycle he will pay the new usage
-  require_auth(user);
   eosio_assert(net.is_valid() && cpu.is_valid(), "invalid quantity");
   eosio_assert(net >= asset(0) && cpu >= asset(0) && (net + cpu) > asset(0),
                "must sell positive stake amount");
@@ -220,12 +227,31 @@ void resource_exchange::reset_delayed_tx(pendingtx tx) {
                      _self);
 }
 void resource_exchange::cycle() {
+  auto state = contract_state.get();
+  const uint32_t secs_to_next = 60 * 60 * 24;  // 1 day
+  time_point_sec this_time = time_point_sec(now());
+
+  eosio_assert(state.timestamp + secs_to_next < this_time, "alredy cycled");
   double cost_per_token = calcosttoken();
+  // unstake users with no account
+  unstakeunknown();
+
   for (auto acnt = accounts.begin(); acnt != accounts.end(); ++acnt) {
     billaccount(acnt->owner, cost_per_token);
     matchbandwidth(*acnt);
     payreward(acnt->owner, cost_per_token);
   }
+
+  transaction out;
+  out.actions.emplace_back(permission_level(_contract, N(active)), _contract,
+                           N(cycle), std::make_tuple());
+
+  out.delay_sec = secs_to_next;
+  out.send(this_time.utc_seconds / secs_to_next /* day as id */, _contract);
+
+  // set timestamp
+  contract_state.set(
+      state_t{state.liquid_funds, state.total_stacked, this_time}, _self);
 }
 
 void resource_exchange::billaccount(account_name owner, double cost_per_token) {
@@ -235,19 +261,15 @@ void resource_exchange::billaccount(account_name owner, double cost_per_token) {
   auto cost_all = asset(cost_per_token * acnt->get_all().amount);
   asset extra_net = asset(0);
   asset extra_cpu = asset(0);
-  // print("all: ", cost_all.amount, " ", cost_per_token);
 
   if (pending_itr != pendingtxs.end()) {
-    // print("pending: ", pending_itr->get_all().amount);
     cost_all += asset(cost_per_token * pending_itr->get_all().amount);
     extra_net += pending_itr->net;
     extra_cpu += pending_itr->cpu;
   }
   eosio_assert(cost_all.amount >= 0, "cost negative");
-  print("cost: ", cost_all, "\n");
   if (acnt->balance >= cost_all) {
     // has cash, buy
-    print("buyin all\n");
     accounts.modify(acnt, 0, [&](auto& account) {
       account.balance -= cost_all;
       account.resource_net += extra_net;
@@ -255,7 +277,7 @@ void resource_exchange::billaccount(account_name owner, double cost_per_token) {
     });
   } else {
     // no cash, cancel tx, try pay for account only
-    reset_delayed_tx(*pending_itr);  // reset stake change of tx
+    reset_delayed_tx(*pending_itr);
     asset cost_account = asset(cost_per_token * acnt->get_all().amount);
     if (acnt->balance >= cost_account) {
       // pay for account
@@ -318,6 +340,23 @@ void resource_exchange::payreward(account_name user, double cost_per_token) {
 
   accounts.modify(acnt, 0,
                   [&](auto& account) { account.balance += asset(reward); });
+}
+
+void resource_exchange::unstakeunknown() {
+  for (auto delegated = delegated_table.begin();
+       delegated != delegated_table.end(); ++delegated) {
+    if (accounts.find(delegated->to) == accounts.end()) {
+      undelegatebw(delegated->to, delegated->net_weight, delegated->cpu_weight);
+      // todo update state
+
+      auto state = contract_state.get();
+      contract_state.set(state_t{state.liquid_funds + (delegated->net_weight +
+                                                       delegated->cpu_weight),
+                                 state.total_stacked - (delegated->net_weight +
+                                                        delegated->cpu_weight)},
+                         _self);
+    }
+  }
 }
 
 asset resource_exchange::calcost(asset resources) {

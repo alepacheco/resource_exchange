@@ -1,6 +1,7 @@
 #include <eosiolib/currency.hpp>
 #include <eosiolib/eosio.hpp>
 #include <eosiolib/singleton.hpp>
+#include <eosiolib/time.hpp>
 #include <eosiolib/types.hpp>
 
 namespace eosio {
@@ -35,7 +36,11 @@ class resource_exchange : public eosio::contract {
   struct state_t {
     asset liquid_funds;
     asset total_stacked;
-    asset get_total() const { return liquid_funds + total_stacked; }
+    time_point_sec timestamp;
+    
+    asset get_total() const {
+      return liquid_funds + total_stacked;
+    }
     EOSLIB_SERIALIZE(state_t, (liquid_funds)(total_stacked))
   };
 
@@ -66,7 +71,8 @@ class resource_exchange : public eosio::contract {
     EOSLIB_SERIALIZE(delegated_bandwidth, (from)(to)(net_weight)(cpu_weight))
   };
   // FIXME import this
-  typedef eosio::multi_index<N(delband), delegated_bandwidth> del_bandwidth_table;
+  typedef eosio::multi_index<N(delband), delegated_bandwidth>
+      del_bandwidth_table;
 
   typedef singleton<N(state), state_t> state_index;
   state_index contract_state;
@@ -88,6 +94,7 @@ class resource_exchange : public eosio::contract {
   void billaccount(account_name account, double cost_per_token);
   void matchbandwidth(account_t user);
   void payreward(account_name user, double cost_per_token);
+  void unstakeunknown();
 
  public:
   resource_exchange(account_name self)
