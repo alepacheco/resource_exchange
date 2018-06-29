@@ -2,3 +2,4 @@
 *.wast
 *.abi
 *.wasm
+bin/

@@ -223,7 +223,7 @@ void resource_exchange::cycle() {
   double cost_per_token = calcosttoken();
   for (auto acnt = accounts.begin(); acnt != accounts.end(); ++acnt) {
     billaccount(acnt->owner, cost_per_token);
-    matchbandith(*acnt);
+    matchbandwidth(*acnt);
     payreward(acnt->owner, cost_per_token);
   }
 }
@@ -313,7 +313,7 @@ void resource_exchange::matchbandwidth(account_t user) {
 
 void resource_exchange::payreward(account_name user, double cost_per_token) {
   const double multiplier = cost_per_token * 0.9;
-  auto acnt = accounts.find(owner);
+  auto acnt = accounts.find(user);
   auto reward = acnt->balance.amount * multiplier;
 
   accounts.modify(acnt, 0,
