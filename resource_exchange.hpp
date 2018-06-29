@@ -66,8 +66,7 @@ class resource_exchange : public eosio::contract {
     EOSLIB_SERIALIZE(delegated_bandwidth, (from)(to)(net_weight)(cpu_weight))
   };
   // FIXME import this
-  typedef eosio::multi_index<N(delband), delegated_bandwidth>
-      del_bandwidth_table;
+  typedef eosio::multi_index<N(delband), delegated_bandwidth> del_bandwidth_table;
 
   typedef singleton<N(state), state_t> state_index;
   state_index contract_state;
@@ -87,6 +86,7 @@ class resource_exchange : public eosio::contract {
 
   void reset_delayed_tx(pendingtx tx);
   void billaccount(account_name account, double cost_per_token);
+  void matchbandwidth(account_t user);
 
  public:
   resource_exchange(account_name self)
@@ -94,7 +94,10 @@ class resource_exchange : public eosio::contract {
         eosio::contract(self),
         accounts(_self, _self),
         pendingtxs(_self, _self),
+        delegated_table(N(eosio), _self),
         contract_state(_self, _self) {}
+
+  del_bandwidth_table delegated_table;
 
   void apply(account_name contract, account_name act);
   void deposit(currency::transfer tx);
