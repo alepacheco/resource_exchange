@@ -87,6 +87,7 @@ class resource_exchange : public eosio::contract {
   void reset_delayed_tx(pendingtx tx);
   void billaccount(account_name account, double cost_per_token);
   void matchbandwidth(account_t user);
+  void payreward(account_name user, double cost_per_token);
 
  public:
   resource_exchange(account_name self)

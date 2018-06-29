@@ -220,19 +220,12 @@ void resource_exchange::reset_delayed_tx(pendingtx tx) {
                      _self);
 }
 void resource_exchange::cycle() {
-  // TODO
-
-  // itirate over accounts, check matching resources, else delegate
-  // undelegate
-
-  // bill account and then match real delegation
-  auto cost_per_token = calcosttoken();
+  double cost_per_token = calcosttoken();
   for (auto acnt = accounts.begin(); acnt != accounts.end(); ++acnt) {
     billaccount(acnt->owner, cost_per_token);
     matchbandith(*acnt);
+    payreward(acnt->owner, cost_per_token);
   }
-
-  // pay hodlers
 }
 
 void resource_exchange::billaccount(account_name owner, double cost_per_token) {
@@ -304,11 +297,11 @@ void resource_exchange::matchbandwidth(account_t user) {
   } else if (net_account < net_delegated) {
     net_to_undelegate += (net_delegated - net_account);
   }
-  
+
   if (cpu_account > net_delegated) {
     cpu_to_delegate += (cpu_account - cpu_delegated);
   } else if (net_account < net_delegated) {
-    cpu_to_undelegate += (cpu_delegated - cpu_account);    
+    cpu_to_undelegate += (cpu_delegated - cpu_account);
   }
   if ((net_to_delegate + cpu_to_delegate) > asset(0)) {
     delegatebw(user.owner, net_to_delegate, cpu_to_delegate);
@@ -316,6 +309,15 @@ void resource_exchange::matchbandwidth(account_t user) {
   if ((net_to_undelegate + cpu_to_undelegate) > asset(0)) {
     undelegatebw(user.owner, net_to_undelegate, cpu_to_undelegate);
   }
+}
+
+void resource_exchange::payreward(account_name user, double cost_per_token) {
+  const double multiplier = cost_per_token * 0.9;
+  auto acnt = accounts.find(owner);
+  auto reward = acnt->balance.amount * multiplier;
+
+  accounts.modify(acnt, 0,
+                  [&](auto& account) { account.balance += asset(reward); });
 }
 
 asset resource_exchange::calcost(asset resources) {
