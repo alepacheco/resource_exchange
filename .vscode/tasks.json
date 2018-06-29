@@ -19,19 +19,19 @@
     {
       "label": "deploy",
       "type": "shell",
-      "command": "cleos --wallet-url=http://localhost:8899/ -u http://localhost:8888/ set contract exchangedeml ./bin/resource_exchange",
+      "command": "cleos --wallet-url=http://localhost:8899/ -u http://localhost:8888/ set contract exchangedop2 ./bin/resource_exchange",
       "problemMatcher": []
     },
     {
       "label": "build & deploy",
       "type": "shell",
-      "command": "eosiocpp -o bin/resource_exchange/resource_exchange.wast resource_exchange.cpp && eosiocpp -g bin/resource_exchange/resource_exchange.abi resource_exchange.cpp && cleos --wallet-url=http://localhost:8899/ -u http://localhost:8888/ set contract exchangedeml ./bin/resource_exchange",
+      "command": "eosiocpp -o bin/resource_exchange/resource_exchange.wast resource_exchange.cpp && eosiocpp -g bin/resource_exchange/resource_exchange.abi resource_exchange.cpp && cleos --wallet-url=http://localhost:8899/ -u http://localhost:8888/ set contract exchangedop2 ./bin/resource_exchange",
       "problemMatcher": []
     },
     {
       "label": "set_eosio_code",
       "type": "shell",
-      "command": "cleos --wallet-url=http://localhost:8899/ -u http://localhost:8888/ set account permission exchangedeml active '{\"threshold\": 1,\"keys\": [{\"key\": \"EOS5cMgd9hqvgaXEnzEEbX2tVr6FkpgvxpPYRgsxm8q3RAC3rJ2zH\",\"weight\": 1}],\"accounts\": [{\"permission\":{\"actor\":\"exchangedeml\",\"permission\":\"eosio.code\"},\"weight\":1}]}' owner -p exchangedeml",
+      "command": "cleos --wallet-url=http://localhost:8899/ -u http://localhost:8888/ set account permission exchangedop2 active '{\"threshold\": 1,\"keys\": [{\"key\": \"EOS5cMgd9hqvgaXEnzEEbX2tVr6FkpgvxpPYRgsxm8q3RAC3rJ2zH\",\"weight\": 1}],\"accounts\": [{\"permission\":{\"actor\":\"exchangedop2\",\"permission\":\"eosio.code\"},\"weight\":1}]}' owner -p exchangedop2",
       "problemMatcher": []
     }
   ]

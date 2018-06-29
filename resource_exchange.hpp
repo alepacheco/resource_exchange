@@ -27,6 +27,9 @@ class resource_exchange : public eosio::contract {
     asset net;
     asset cpu;
     asset get_all() const { return cpu + net; }
+    bool is_empty() const {
+      return !(net.amount | cpu.amount);
+    }
 
     uint64_t primary_key() const { return user; }
     EOSLIB_SERIALIZE(pendingtx, (user)(net)(cpu))
@@ -41,7 +44,7 @@ class resource_exchange : public eosio::contract {
     asset get_total() const {
       return liquid_funds + total_stacked;
     }
-    EOSLIB_SERIALIZE(state_t, (liquid_funds)(total_stacked))
+    EOSLIB_SERIALIZE(state_t, (liquid_funds)(total_stacked)(timestamp))
   };
 
   //@abi table account i64
@@ -61,7 +64,6 @@ class resource_exchange : public eosio::contract {
     EOSLIB_SERIALIZE(account_t, (owner)(balance)(resource_net)(resource_cpu))
   };
 
-  // FIXME import this
   struct delegated_bandwidth {
     account_name from;
     account_name to;
@@ -70,7 +72,7 @@ class resource_exchange : public eosio::contract {
     uint64_t primary_key() const { return to; }
     EOSLIB_SERIALIZE(delegated_bandwidth, (from)(to)(net_weight)(cpu_weight))
   };
-  // FIXME import this
+
   typedef eosio::multi_index<N(delband), delegated_bandwidth>
       del_bandwidth_table;
 
@@ -92,7 +94,7 @@ class resource_exchange : public eosio::contract {
 
   void reset_delayed_tx(pendingtx tx);
   void billaccount(account_name account, double cost_per_token);
-  void matchbandwidth(account_t user);
+  void matchbandwidth(account_name user);
   void payreward(account_name user, double cost_per_token);
   void unstakeunknown();
 
@@ -119,10 +121,7 @@ class resource_exchange : public eosio::contract {
   /// @abi action
   void withdraw(account_name user, asset quantity);
 
-  /// @abi action
   asset calcost(asset res);
-
-  /// @abi action
   double calcosttoken();
 
   /// @abi action
