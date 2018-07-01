@@ -291,11 +291,15 @@ void resource_exchange::cycle() {
 
   double cost_per_token = calcosttoken();
   unstakeunknown();
+  asset fees_collected = asset(0);
   for (auto acnt = accounts.begin(); acnt != accounts.end(); ++acnt) {
-    billaccount(acnt->owner, cost_per_token);
+    fees_collected += billaccount(acnt->owner, cost_per_token);
     matchbandwidth(acnt->owner);
-    payreward(acnt->owner, cost_per_token);
   }
+  for (auto acnt = accounts.begin(); acnt != accounts.end(); ++acnt) {
+    payreward(acnt->owner, fees_collected);
+  }
+  print("Total fees: ", fees_collected, " ");
 
   out.delay_sec = secs_to_next.utc_seconds;
   out.send(this_time.utc_seconds, _contract);
@@ -305,13 +309,14 @@ void resource_exchange::cycle() {
       state_t{state.liquid_funds, state.total_stacked, this_time}, _self);
 }
 
-void resource_exchange::billaccount(account_name owner, double cost_per_token) {
+asset resource_exchange::billaccount(account_name owner, double cost_per_token) {
   auto acnt = accounts.find(owner);
   auto pending_itr = pendingtxs.find(acnt->owner);
 
   auto cost_all = asset(cost_per_token * acnt->get_all().amount);
   asset extra_net = asset(0);
   asset extra_cpu = asset(0);
+  asset fee_collected = asset(0);
 
   if (pending_itr != pendingtxs.end()) {
     cost_all += asset(cost_per_token * pending_itr->get_all().amount);
@@ -326,6 +331,7 @@ void resource_exchange::billaccount(account_name owner, double cost_per_token) {
       account.resource_net += extra_net;
       account.resource_cpu += extra_cpu;
     });
+    fee_collected += cost_all;
   } else {
     if (pending_itr != pendingtxs.end()) {
       reset_delayed_tx(*pending_itr);
@@ -334,6 +340,7 @@ void resource_exchange::billaccount(account_name owner, double cost_per_token) {
     if (acnt->balance >= cost_account) {
       accounts.modify(acnt, 0,
                       [&](auto& account) { account.balance -= cost_account; });
+      fee_collected += cost_account;
     } else {
       // no balance: reset account
       auto state = contract_state.get();
@@ -352,6 +359,7 @@ void resource_exchange::billaccount(account_name owner, double cost_per_token) {
   if (pending_itr != pendingtxs.end()) {
     pendingtxs.erase(pending_itr);
   }
+  return fee_collected;
 }
 
 void resource_exchange::matchbandwidth(account_name owner) {
@@ -390,14 +398,12 @@ void resource_exchange::matchbandwidth(account_name owner) {
   }
 }
 
-void resource_exchange::payreward(account_name user, double cost_per_token) {
+void resource_exchange::payreward(account_name user, asset fee_collected) {
   auto state = contract_state.get();
-  const double multiplier = cost_per_token * 0.9;
-  auto total_reward = state.total_stacked.amount * multiplier;
-  auto reward_per_token = total_reward / state.get_total().amount;
+  double fees = fee_collected.amount * 1;
+  double reward_per_token = fees/state.get_total().amount;
   auto acnt = accounts.find(user);
-  auto reward = acnt->balance.amount * reward_per_token;
-
+  double reward = acnt->balance.amount * reward_per_token;
   accounts.modify(acnt, 0,
                   [&](auto& account) { account.balance += asset(reward); });
 }

@@ -96,9 +96,9 @@ class resource_exchange : public eosio::contract {
   void dobuystake(account_name user, asset net, asset cpu);
 
   void reset_delayed_tx(pendingtx tx);
-  void billaccount(account_name account, double cost_per_token);
+  asset billaccount(account_name account, double cost_per_token);
   void matchbandwidth(account_name user);
-  void payreward(account_name user, double cost_per_token);
+  void payreward(account_name user, asset fee_collected);
   void unstakeunknown();
 
  public:
