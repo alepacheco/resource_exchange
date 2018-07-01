@@ -51,6 +51,10 @@ void resource_exchange::apply(account_name contract, account_name act) {
   }
 }
 
+/**
+ * When a tx is received, the exchange will create an account or find an
+ *existing one and add the amount to the account and to the liquid state
+ **/
 void resource_exchange::deposit(currency::transfer tx) {
   eosio_assert(tx.quantity.is_valid(), "invalid quantity");
   eosio_assert(tx.quantity.symbol == asset().symbol,
@@ -72,11 +76,19 @@ void resource_exchange::deposit(currency::transfer tx) {
                      _self);
 }
 
+/**
+ * Withdraw deducts the amount from the user account and from the liquid state
+ * this funds will not be considered as part of the exchange, on the next cycle
+ *the price will increase, reducing the resource consuption and the tokens will
+ *be unstaked and accesible on 3 days
+ **/
 void resource_exchange::withdraw(account_name to, asset quantity) {
   eosio_assert(quantity.is_valid(), "invalid quantity");
   eosio_assert(quantity.amount > 0, "must withdraw positive quantity");
 
+  auto state = contract_state.get();
   auto itr = accounts.find(to);
+  print(name{to});
   eosio_assert(itr != accounts.end(), "unknown account");
 
   accounts.modify(itr, 0, [&](auto& acnt) {
@@ -85,20 +97,34 @@ void resource_exchange::withdraw(account_name to, asset quantity) {
   });
 
   // Update contract state
-  auto state = contract_state.get();
   contract_state.set(state_t{state.liquid_funds - quantity, state.total_stacked,
                              state.timestamp},
                      _self);
 
-  action(permission_level(_contract, N(active)), N(eosio.token), N(transfer),
-         std::make_tuple(_contract, to, quantity, std::string("")))
-      .send();
+  // if liquid withdraw now, else wait tree days
+  auto liquid_funds = contract_balance.find(asset().symbol.name())->balance;
+  if (quantity <= liquid_funds) {
+    action(permission_level(_contract, N(active)), N(eosio.token), N(transfer),
+           std::make_tuple(_contract, to, quantity, std::string("")))
+        .send();
+  } else {
+    eosio::transaction out;
+    out.actions.emplace_back(
+        permission_level(_contract, N(active)), N(eosio.token), N(transfer),
+        std::make_tuple(_contract, to, quantity, std::string("")));
+
+    out.delay_sec = 60 * 60 * 24 * 3 + 100;  // Three days plus safety seconds
+    out.send(to, _contract);
+  }
 
   if (itr->is_empty()) {
     accounts.erase(itr);
   }
 }
 
+/**
+ * Delegatebw is a shortcut for the delegatebw action
+ **/
 void resource_exchange::delegatebw(account_name receiver,
                                    asset stake_net_quantity,
                                    asset stake_cpu_quantity) {
@@ -107,6 +133,10 @@ void resource_exchange::delegatebw(account_name receiver,
                          stake_cpu_quantity, false))
       .send();
 }
+
+/**
+ * Unelegatebw is a shortcut for the unelegatebw action
+ **/
 void resource_exchange::undelegatebw(account_name receiver,
                                      asset stake_net_quantity,
                                      asset stake_cpu_quantity) {
@@ -116,6 +146,11 @@ void resource_exchange::undelegatebw(account_name receiver,
       .send();
 }
 
+/**
+ * Buystake will schedule a purchase of stake for the next cycle,
+ * it will update an existing scheduled purchase or create a new one
+ * and will set the funds as staked
+ **/
 void resource_exchange::buystake(account_name from, asset net, asset cpu) {
   eosio_assert(net.is_valid() && cpu.is_valid(), "invalid quantity");
   eosio_assert(net.symbol == asset().symbol && cpu.symbol == asset().symbol,
@@ -158,6 +193,10 @@ void resource_exchange::buystake(account_name from, asset net, asset cpu) {
       _self);
 }
 
+/**
+ * Sellstake will remove resources used from a delayed tx if any
+ * or sell the remove resources used from the account
+ **/
 void resource_exchange::sellstake(account_name user, asset net, asset cpu) {
   // to sell reduce account resources, in next cycle he will pay the new usage
   eosio_assert(net.is_valid() && cpu.is_valid(), "invalid quantity");
@@ -178,7 +217,7 @@ void resource_exchange::sellstake(account_name user, asset net, asset cpu) {
   }
 
   eosio_assert(usr_cpu >= cpu && usr_net >= net && (net + cpu) > asset(0),
-               "not enought to sell");
+               "not enough to sell");
 
   // reduce first in tx then in account
   if (pending_itr == pendingtxs.end()) {
@@ -190,7 +229,7 @@ void resource_exchange::sellstake(account_name user, asset net, asset cpu) {
     auto amount_tx_net = pending_itr->net - net;
     auto amount_tx_cpu = pending_itr->cpu - cpu;
 
-    if (amount_tx_cpu >= asset(0)) {  // if enought to cover with tx
+    if (amount_tx_cpu >= asset(0)) {  // if enough to cover with tx
       pendingtxs.modify(pending_itr, 0,
                         [&](auto& tx) { tx.cpu = amount_tx_cpu; });
     } else {  // split with tx and account
@@ -220,6 +259,9 @@ void resource_exchange::sellstake(account_name user, asset net, asset cpu) {
       _self);
 }
 
+/**
+ * Reset_delayed_tx will revert the state when a delayed tx cannot be completed
+ **/
 void resource_exchange::reset_delayed_tx(pendingtx tx) {
   auto state = contract_state.get();
   contract_state.set(
@@ -230,7 +272,8 @@ void resource_exchange::reset_delayed_tx(pendingtx tx) {
 }
 void resource_exchange::cycle() {
   print("Run cycle\n");
-  auto secs_to_next = time_point_sec(60 * 60 * 24);  // 1 day
+  auto secs_to_next = time_point_sec(60); // Run every minute
+                                          // * TODO tune 
   auto secs_flexibility = time_point_sec(5);
   auto state = contract_state.get();
   time_point_sec this_time = time_point_sec(now());
@@ -365,7 +408,8 @@ void resource_exchange::unstakeunknown() {
   }
   for (auto delegated = delegated_table.begin();
        delegated != delegated_table.end(); ++delegated) {
-    if (accounts.find(delegated->to) == accounts.end()) {
+    if (accounts.find(delegated->to) == accounts.end() &&
+        delegated->to != _contract) {
       undelegatebw(delegated->to, delegated->net_weight, delegated->cpu_weight);
       auto state = contract_state.get();
       contract_state.set(state_t{state.liquid_funds + (delegated->net_weight +
@@ -377,14 +421,17 @@ void resource_exchange::unstakeunknown() {
     }
   }
 }
-
+/**
+ * Function to calculate aproximate cost of resources taking into account state
+ * changes with purchase
+ **/
 asset resource_exchange::calcost(asset resources) {
   if (resources <= asset(0)) {
     return asset(0);
   }
   eosio_assert(contract_state.exists(), "No contract state available");
-  int PURCHASE_STEP = 10000;  // the lower the more persice but more cpu
-  int PRICE_TUNE = 100;
+  int PURCHASE_STEP = 10000;  // the lower the more precise but more cpu
+  int PRICE_TUNE = 10000;
   auto state = contract_state.get();
   int64_t purchase = resources.amount;
   double_t liquid = state.liquid_funds.amount;
@@ -408,7 +455,7 @@ asset resource_exchange::calcost(asset resources) {
 
 double resource_exchange::calcosttoken() {
   eosio_assert(contract_state.exists(), "No contract state available");
-  int PRICE_TUNE = 100;
+  int PRICE_TUNE = 10000;
   auto state = contract_state.get();
   double liquid = state.liquid_funds.amount;
   double total = state.get_total().amount;

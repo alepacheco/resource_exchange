@@ -21,6 +21,17 @@
  - withdraw: get fund out from exchange
  - buystake: stake net and cpu to your account
  - sellstake: cancel or reduce stake consumption
+
+## How to Lease tokens:
+ - Send the tokens you want to lease to the exchange contract
+ - You will be automatically earning dividends based on your amount and the current market price
+ - Withdraw them using the withdraw function, this will be done automatically if there are tokens unstaked or you will have to wait 3 days
+
+# How to Rent tokens:
+ - Deposit tokens in the contract
+ - Execute buystake action with amount of tokens for net and cpu you want to rent
+ - Wait for next cycle (you will be billed every cycle)
+ - You will have tokens delegated to your account
  
 ## How the exchange works
 

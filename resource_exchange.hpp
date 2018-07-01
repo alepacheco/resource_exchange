@@ -27,9 +27,7 @@ class resource_exchange : public eosio::contract {
     asset net;
     asset cpu;
     asset get_all() const { return cpu + net; }
-    bool is_empty() const {
-      return !(net.amount | cpu.amount);
-    }
+    bool is_empty() const { return !(net.amount | cpu.amount); }
 
     uint64_t primary_key() const { return user; }
     EOSLIB_SERIALIZE(pendingtx, (user)(net)(cpu))
@@ -40,10 +38,8 @@ class resource_exchange : public eosio::contract {
     asset liquid_funds;
     asset total_stacked;
     time_point_sec timestamp;
-    
-    asset get_total() const {
-      return liquid_funds + total_stacked;
-    }
+
+    asset get_total() const { return liquid_funds + total_stacked; }
     EOSLIB_SERIALIZE(state_t, (liquid_funds)(total_stacked)(timestamp))
   };
 
@@ -76,6 +72,13 @@ class resource_exchange : public eosio::contract {
   typedef eosio::multi_index<N(delband), delegated_bandwidth>
       del_bandwidth_table;
 
+  struct account_balance {
+    asset balance;
+    uint64_t primary_key() const { return balance.symbol.name(); }
+  };
+
+  typedef eosio::multi_index<N(accounts), account_balance> account_balances;
+
   typedef singleton<N(state), state_t> state_index;
   state_index contract_state;
 
@@ -105,9 +108,11 @@ class resource_exchange : public eosio::contract {
         accounts(_self, _self),
         pendingtxs(_self, _self),
         delegated_table(N(eosio), _self),
+        contract_balance(N(eosio.token), _self),
         contract_state(_self, _self) {}
 
   del_bandwidth_table delegated_table;
+  account_balances contract_balance;
 
   void apply(account_name contract, account_name act);
   void deposit(currency::transfer tx);
