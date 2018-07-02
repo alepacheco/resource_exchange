@@ -252,11 +252,12 @@ void resource_exchange::sellstake(account_name user, asset net, asset cpu) {
     }
   }
 
-  auto state = contract_state.get();
+  // TODO mark as liquid on the next cycle when refunded (not refunding here)
+  /* auto state = contract_state.get(); 
   contract_state.set(
       state_t{state.liquid_funds + (net + cpu),
               state.total_stacked - (net + cpu), state.timestamp},
-      _self);
+      _self); */
 }
 
 /**
@@ -270,10 +271,13 @@ void resource_exchange::reset_delayed_tx(pendingtx tx) {
               state.timestamp},
       _self);
 }
+
+/** 
+ * Cycle is run every 3.5 days, that way 
+**/
 void resource_exchange::cycle() {
   print("Run cycle\n");
-  auto secs_to_next = time_point_sec(60); // Run every minute
-                                          // * TODO tune 
+  auto secs_to_next = time_point_sec(60*60*24*3.5); // TODO, every 3.5 days
   auto secs_flexibility = time_point_sec(5);
   auto state = contract_state.get();
   time_point_sec this_time = time_point_sec(now());
@@ -395,6 +399,9 @@ void resource_exchange::matchbandwidth(account_name owner) {
   }
   if ((net_to_undelegate + cpu_to_undelegate) > asset(0)) {
     undelegatebw(user->owner, net_to_undelegate, cpu_to_undelegate);
+    // TODO add to refunding
+    // * Remove from price and available calculation
+    // * Set as liquid on next cycle
   }
 }
 
@@ -468,7 +475,7 @@ double resource_exchange::calcosttoken() {
   double cost_per_token = ((total * total / liquid) /
                            (total * PRICE_TUNE));  // TODO find optimal function
 
-  print("price token: ", asset(cost_per_token * 10000), "\n");
+  print("price token: ", asset(cost_per_token * 10000), "::", cost_per_token, "\n");
   return cost_per_token;
 }
 }  // namespace eosio

@@ -1,5 +1,7 @@
 # Resources exchange for EOS blockchain
 
+## Work in progress, not ready for new eosio code release
+
 ### The aim of this contract is to create a self regulated market for CPU and Bandwidth on the eos blockchain
 
 > This contract is under development
