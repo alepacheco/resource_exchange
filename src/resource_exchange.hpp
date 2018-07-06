@@ -1,13 +1,17 @@
-#include <eosiolib/currency.hpp>
+#pragma once
 #include <eosiolib/eosio.hpp>
 #include <eosiolib/singleton.hpp>
 #include <eosiolib/time.hpp>
 #include <eosiolib/types.hpp>
-
+#include <eosiolib/currency.hpp>
+#include <eosiolib/eosio.hpp>
+#include <eosiolib/print.hpp>
+#include <eosiolib/transaction.hpp>
 namespace eosio {
 class resource_exchange : public eosio::contract {
  private:
   account_name _contract;
+  const uint32_t CYCLE_TIME = 60 * 60 * 25 * 3; // 3 days and three hours
 
   struct stake_trade {
     account_name user;
@@ -100,6 +104,7 @@ class resource_exchange : public eosio::contract {
   void matchbandwidth(account_name user);
   void payreward(account_name user, asset fee_collected);
   void unstakeunknown();
+  void docycle();
 
  public:
   resource_exchange(account_name self)

@@ -6,7 +6,7 @@
       "group": "build",
       "type": "shell",
       "command":
-        "eosiocpp -o bin/resource_exchange/resource_exchange.wast resource_exchange.cpp && eosiocpp -g bin/resource_exchange/resource_exchange.abi resource_exchange.cpp",
+        "eosiocpp -o bin/resource_exchange/resource_exchange.wast src/resource_exchange.cpp && eosiocpp -g bin/resource_exchange/resource_exchange.abi src/resource_exchange.cpp",
       "problemMatcher": []
     },
     {
@@ -25,7 +25,7 @@
     {
       "label": "build & deploy",
       "type": "shell",
-      "command": "eosiocpp -o bin/resource_exchange/resource_exchange.wast resource_exchange.cpp && eosiocpp -g bin/resource_exchange/resource_exchange.abi resource_exchange.cpp && cleos --wallet-url=http://localhost:8899/ -u http://localhost:8888/ set contract exchangedop2 ./bin/resource_exchange",
+      "command": "eosiocpp -o bin/resource_exchange/resource_exchange.wast src/resource_exchange.cpp && eosiocpp -g bin/resource_exchange/resource_exchange.abi src/resource_exchange.cpp && cleos --wallet-url=http://localhost:8899/ -u http://localhost:8888/ set contract exchangedop2 ./bin/resource_exchange",
       "problemMatcher": []
     },
     {
