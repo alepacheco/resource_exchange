@@ -1,4 +1,6 @@
+#pragma once
 #include "resource_exchange.hpp"
+#include "state_manager.cpp"
 
 namespace eosio {
 /**
@@ -11,19 +13,14 @@ void resource_exchange::deposit(currency::transfer tx) {
                "asset must be system token");
 
   auto itr = accounts.find(tx.from);
-  // Create new account if it doesn't exist
+
   if (itr == accounts.end()) {
     itr = accounts.emplace(tx.from, [&](auto& acnt) { acnt.owner = tx.from; });
   }
 
-  // Update account
   accounts.modify(itr, 0, [&](auto& acnt) { acnt.balance += tx.quantity; });
 
-  // Update contract state
-  auto state = contract_state.get();
-  contract_state.set(state_t{state.liquid_funds + tx.quantity,
-                             state.total_stacked, state.timestamp},
-                     _self);
+  state_on_deposit(tx.quantity);
 }
 
 /**
@@ -46,7 +43,7 @@ void resource_exchange::withdraw(account_name to, asset quantity) {
         permission_level(_contract, N(active)), N(eosio.token), N(transfer),
         std::make_tuple(_contract, to, quantity, std::string("")));
 
-    out.delay_sec = 60 * 60 * 24 * 3 + 100;  // Three days plus safety seconds
+    out.delay_sec = CYCLE_TIME + 100;  // Three days plus safety seconds
     out.send(to, _contract);
   }
 
@@ -60,26 +57,20 @@ void resource_exchange::withdraw(account_name to, asset quantity) {
     acnt.balance -= quantity;
   });
 
-  // Update contract state
-  contract_state.set(state_t{state.liquid_funds - quantity, state.total_stacked,
-                             state.timestamp},
-                     _self);
+  state_on_withdraw(quantity);
 
-  // if liquid withdraw now, else wait tree days 
-  // ! FIX 
+  // if liquid withdraw now, else wait tree days
+  // ! FIX
   if (quantity <= liquid_funds) {
     action(permission_level(_contract, N(active)), N(eosio.token), N(transfer),
            std::make_tuple(_contract, to, quantity, std::string("")))
         .send();
   } else {
-    
   }
 
   if (itr->is_empty()) {
     accounts.erase(itr);
   }
 }
-
-
 
 }  // namespace eosio

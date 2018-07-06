@@ -1,14 +1,14 @@
 #include "resource_exchange.hpp"
-#include "bandwidth.cpp"
 #include "accounts.cpp"
+#include "bandwidth.cpp"
 #include "stake.cpp"
+#include "state_manager.cpp"
+#include "pricing.cpp"
+
 
 namespace eosio {
 void resource_exchange::apply(account_name contract, account_name act) {
-  if (!contract_state.exists()) {
-    contract_state.set(state_t{asset(0), asset(0), time_point_sec(0)},
-                       _contract);
-  }
+  state_init();
 
   switch (act) {
     case N(transfer): {
@@ -48,20 +48,8 @@ void resource_exchange::apply(account_name contract, account_name act) {
 }
 
 /**
- * Reset_delayed_tx will revert the state when a delayed tx cannot be completed
- **/
-void resource_exchange::reset_delayed_tx(pendingtx tx) {
-  auto state = contract_state.get();
-  contract_state.set(
-      state_t{state.liquid_funds + asset(tx.net.amount + tx.cpu.amount),
-              state.total_stacked - asset(tx.net.amount + tx.cpu.amount),
-              state.timestamp},
-      _self);
-}
-
-/** 
  * Cycle is run every CYCLE_TIME
-**/
+ **/
 void resource_exchange::cycle() {
   print("Run cycle\n");
   auto secs_to_next = time_point_sec(CYCLE_TIME);
@@ -85,9 +73,7 @@ void resource_exchange::cycle() {
   out.delay_sec = secs_to_next.utc_seconds;
   out.send(this_time.utc_seconds, _contract);
 
-  // set timestamp
-  contract_state.set(
-      state_t{state.liquid_funds, state.total_stacked, this_time}, _self);
+  state_set_timestamp(this_time);
 }
 
 void resource_exchange::docycle() {
@@ -106,7 +92,8 @@ void resource_exchange::docycle() {
   print("Total fees: ", fees_collected, " ");
 }
 
-asset resource_exchange::billaccount(account_name owner, double cost_per_token) {
+asset resource_exchange::billaccount(account_name owner,
+                                     double cost_per_token) {
   auto acnt = accounts.find(owner);
   auto pending_itr = pendingtxs.find(acnt->owner);
 
@@ -140,13 +127,7 @@ asset resource_exchange::billaccount(account_name owner, double cost_per_token) 
       fee_collected += cost_account;
     } else {
       // no balance: reset account
-      auto state = contract_state.get();
-      contract_state.set(
-          state_t{
-              state.liquid_funds + (acnt->resource_net + acnt->resource_cpu),
-              state.total_stacked - (acnt->resource_net + acnt->resource_cpu),
-              state.timestamp},
-          _self);
+      state_on_reset_account(acnt->resource_net + acnt->resource_cpu);
       accounts.modify(acnt, 0, [&](auto& account) {
         account.resource_net = asset(0);
         account.resource_cpu = asset(0);
@@ -198,82 +179,6 @@ void resource_exchange::matchbandwidth(account_name owner) {
   }
 }
 
-void resource_exchange::payreward(account_name user, asset fee_collected) {
-  auto state = contract_state.get();
-  double fees = fee_collected.amount * 1;
-  double reward_per_token = fees/state.get_total().amount;
-  auto acnt = accounts.find(user);
-  double reward = acnt->balance.amount * reward_per_token;
-  accounts.modify(acnt, 0,
-                  [&](auto& account) { account.balance += asset(reward); });
-}
-
-void resource_exchange::unstakeunknown() {
-  if (delegated_table.begin() == delegated_table.end()) {
-    return;
-  }
-  for (auto delegated = delegated_table.begin();
-       delegated != delegated_table.end(); ++delegated) {
-    if (accounts.find(delegated->to) == accounts.end() &&
-        delegated->to != _contract) {
-      undelegatebw(delegated->to, delegated->net_weight, delegated->cpu_weight);
-      auto state = contract_state.get();
-      contract_state.set(state_t{state.liquid_funds + (delegated->net_weight +
-                                                       delegated->cpu_weight),
-                                 state.total_stacked - (delegated->net_weight +
-                                                        delegated->cpu_weight),
-                                 state.timestamp},
-                         _self);
-    }
-  }
-}
-/**
- * Function to calculate aproximate cost of resources taking into account state
- * changes with purchase
- **/
-asset resource_exchange::calcost(asset resources) {
-  if (resources <= asset(0)) {
-    return asset(0);
-  }
-  eosio_assert(contract_state.exists(), "No contract state available");
-  int PURCHASE_STEP = 10000;  // the lower the more precise but more cpu
-  int PRICE_TUNE = 10000;
-  auto state = contract_state.get();
-  int64_t purchase = resources.amount;
-  double_t liquid = state.liquid_funds.amount;
-  double_t total = state.get_total().amount;
-
-  // purchases of 1 EOS at a time, to get fair price as the resources get
-  // scarcer
-  int32_t steps = purchase / PURCHASE_STEP;
-  double_t cost_per_token = 0;
-  for (int i = 0; i < steps; i++) {
-    cost_per_token += ((total * total / liquid) /
-                       (total * PRICE_TUNE));  // TODO find optimal function
-    liquid -= PURCHASE_STEP;
-  }
-  cost_per_token = cost_per_token / steps;
-
-  asset price = asset(cost_per_token * purchase);
-  print("price: ", price, "\n");
-  return price;
-}
-
-/**
- * Returns cost per Larimer
-**/
-double resource_exchange::calcosttoken() {
-  eosio_assert(contract_state.exists(), "No contract state available");
-  int PRICE_TUNE = 10000;
-  auto state = contract_state.get();
-  double liquid = state.liquid_funds.amount;
-  double total = state.get_total().amount;
-  double cost_per_token = ((total * total / liquid) /
-                           (total * PRICE_TUNE));  // TODO find optimal function
-
-  print("price token: ", asset(cost_per_token * 10000), "::", cost_per_token, "\n");
-  return cost_per_token;
-}
 }  // namespace eosio
 
 extern "C" {

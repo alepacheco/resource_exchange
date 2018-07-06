@@ -1,17 +1,16 @@
 #pragma once
-#include <eosiolib/eosio.hpp>
-#include <eosiolib/singleton.hpp>
-#include <eosiolib/time.hpp>
-#include <eosiolib/types.hpp>
 #include <eosiolib/currency.hpp>
 #include <eosiolib/eosio.hpp>
 #include <eosiolib/print.hpp>
+#include <eosiolib/singleton.hpp>
+#include <eosiolib/time.hpp>
 #include <eosiolib/transaction.hpp>
+#include <eosiolib/types.hpp>
 namespace eosio {
 class resource_exchange : public eosio::contract {
  private:
   account_name _contract;
-  const uint32_t CYCLE_TIME = 60 * 60 * 25 * 3; // 3 days and three hours
+  const uint32_t CYCLE_TIME = 60 * 60 * 25 * 3;  // 3 days and three hours
 
   struct stake_trade {
     account_name user;
@@ -104,6 +103,17 @@ class resource_exchange : public eosio::contract {
   void matchbandwidth(account_name user);
   void payreward(account_name user, asset fee_collected);
   void unstakeunknown();
+
+  void state_on_deposit(asset quantity);
+  void state_on_withdraw(asset quantity);
+  void state_set_timestamp(time_point_sec this_time);
+  void state_on_sellstake(asset stake);
+  void state_on_buystake(asset stake);
+  void state_on_reset_account(asset account_res);
+  void state_on_undelegate_unknown(asset delegated);
+  void state_change(asset liquid, asset staked);
+  void state_init();
+  
   void docycle();
 
  public:

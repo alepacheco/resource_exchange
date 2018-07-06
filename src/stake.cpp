@@ -1,4 +1,6 @@
+#pragma once
 #include "resource_exchange.hpp"
+#include "state_manager.cpp"
 
 namespace eosio {
 /**
@@ -42,10 +44,7 @@ void resource_exchange::buystake(account_name from, asset net, asset cpu) {
     tx.cpu = adj_cpu;
   });
 
-  contract_state.set(
-      state_t{state.liquid_funds - (net + cpu),
-              state.total_stacked + (net + cpu), state.timestamp},
-      _self);
+  state_on_buystake(net + cpu);
 }
 
 /**
@@ -108,11 +107,7 @@ void resource_exchange::sellstake(account_name user, asset net, asset cpu) {
   }
 
   // TODO mark as liquid on the next cycle when refunded (not refunding here)
-  /* auto state = contract_state.get(); 
-  contract_state.set(
-      state_t{state.liquid_funds + (net + cpu),
-              state.total_stacked - (net + cpu), state.timestamp},
-      _self); */
+  state_on_sellstake(net + cpu);
 }
 
 }  // namespace eosio
