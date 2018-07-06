@@ -28,18 +28,18 @@ void resource_exchange::undelegatebw(account_name receiver,
 }
 
 void resource_exchange::unstakeunknown() {
-    if (delegated_table.begin() == delegated_table.end()) {
-      return;
-    }
-    for (auto delegated = delegated_table.begin();
-        delegated != delegated_table.end(); ++delegated) {
-      if (accounts.find(delegated->to) == accounts.end() &&
-          delegated->to != _contract) {
-        undelegatebw(delegated->to, delegated->net_weight, delegated->cpu_weight);
-        asset undelegating = delegated->net_weight + delegated->cpu_weight;
-        state_on_undelegate_unknown(undelegating);
-      }
+  if (delegated_table.begin() == delegated_table.end()) {
+    return;
+  }
+  for (auto delegated = delegated_table.begin();
+       delegated != delegated_table.end(); ++delegated) {
+    if (accounts.find(delegated->to) == accounts.end() &&
+        delegated->to != _contract) {
+      undelegatebw(delegated->to, delegated->net_weight, delegated->cpu_weight);
+      asset undelegating = delegated->net_weight + delegated->cpu_weight;
+      state_on_undelegate_unknown(undelegating);
     }
   }
+}
 
 }  // namespace eosio

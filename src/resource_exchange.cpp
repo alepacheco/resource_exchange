@@ -1,10 +1,9 @@
 #include "resource_exchange.hpp"
 #include "accounts.cpp"
 #include "bandwidth.cpp"
+#include "pricing.cpp"
 #include "stake.cpp"
 #include "state_manager.cpp"
-#include "pricing.cpp"
-
 
 namespace eosio {
 void resource_exchange::apply(account_name contract, account_name act) {

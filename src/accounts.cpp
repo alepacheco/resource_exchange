@@ -43,7 +43,7 @@ void resource_exchange::withdraw(account_name to, asset quantity) {
         permission_level(_contract, N(active)), N(eosio.token), N(transfer),
         std::make_tuple(_contract, to, quantity, std::string("")));
 
-    out.delay_sec = CYCLE_TIME + 100;  // Three days plus safety seconds
+    out.delay_sec = CYCLE_TIME + 100;
     out.send(to, _contract);
   }
 

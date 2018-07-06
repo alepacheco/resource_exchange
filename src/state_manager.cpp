@@ -11,8 +11,8 @@ void resource_exchange::state_init() {
 
 void resource_exchange::state_change(asset liquid, asset staked) {
   auto state = contract_state.get();
-  contract_state.set(state_t{state.liquid_funds + liquid, state.total_stacked + staked,
-                             state.timestamp},
+  contract_state.set(state_t{state.liquid_funds + liquid,
+                             state.total_stacked + staked, state.timestamp},
                      _self);
 }
 
@@ -25,7 +25,8 @@ void resource_exchange::state_on_withdraw(asset quantity) {
 }
 
 void resource_exchange::reset_delayed_tx(pendingtx tx) {
-  state_change(asset(tx.net.amount + tx.cpu.amount), -asset(tx.net.amount + tx.cpu.amount));
+  state_change(asset(tx.net.amount + tx.cpu.amount),
+               -asset(tx.net.amount + tx.cpu.amount));
 }
 
 void resource_exchange::state_set_timestamp(time_point_sec this_time) {
@@ -49,9 +50,5 @@ void resource_exchange::state_on_buystake(asset stake) {
 void resource_exchange::state_on_sellstake(asset stake) {
   state_change(stake, -stake);
 }
-
-
-
-
 
 }  // namespace eosio

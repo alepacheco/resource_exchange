@@ -113,7 +113,7 @@ class resource_exchange : public eosio::contract {
   void state_on_undelegate_unknown(asset delegated);
   void state_change(asset liquid, asset staked);
   void state_init();
-  
+
   void docycle();
 
  public:
