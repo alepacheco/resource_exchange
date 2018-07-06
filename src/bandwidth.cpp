@@ -42,4 +42,40 @@ void resource_exchange::unstakeunknown() {
   }
 }
 
+void resource_exchange::matchbandwidth(account_name owner) {
+  auto user = accounts.find(owner);
+  auto delegated = delegated_table.find(user->owner);
+
+  asset net_delegated = asset(0);
+  asset cpu_delegated = asset(0);
+
+  if (delegated != delegated_table.end()) {
+    net_delegated = delegated->net_weight;
+    cpu_delegated = delegated->cpu_weight;
+  }
+  asset net_account = user->resource_net;
+  asset cpu_account = user->resource_cpu;
+  asset net_to_delegate = asset(0);
+  asset net_to_undelegate = asset(0);
+  asset cpu_to_delegate = asset(0);
+  asset cpu_to_undelegate = asset(0);
+  if (net_account > net_delegated) {
+    net_to_delegate += (net_account - net_delegated);
+  } else if (net_account < net_delegated) {
+    net_to_undelegate += (net_delegated - net_account);
+  }
+
+  if (cpu_account > cpu_delegated) {
+    cpu_to_delegate += (cpu_account - cpu_delegated);
+  } else if (cpu_account < cpu_delegated) {
+    cpu_to_undelegate += (cpu_delegated - cpu_account);
+  }
+  if ((net_to_delegate + cpu_to_delegate) > asset(0)) {
+    delegatebw(user->owner, net_to_delegate, cpu_to_delegate);
+  }
+  if ((net_to_undelegate + cpu_to_undelegate) > asset(0)) {
+    undelegatebw(user->owner, net_to_undelegate, cpu_to_undelegate);
+  }
+}
+
 }  // namespace eosio

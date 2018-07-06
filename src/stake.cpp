@@ -73,32 +73,47 @@ void resource_exchange::sellstake(account_name user, asset net, asset cpu) {
   eosio_assert(usr_cpu >= cpu && usr_net >= net && (net + cpu) > asset(0),
                "not enough to sell");
 
+  // resourses removed from where
+  asset net_from_account = asset(0);
+  asset cpu_from_account = asset(0);
+  asset net_from_tx = asset(0);
+  asset cpu_from_tx = asset(0);
+
   // reduce first in tx then in account
   if (pending_itr == pendingtxs.end()) {
     accounts.modify(itr, 0, [&](auto& acnt) {
       acnt.resource_net -= usr_net;
       acnt.resource_cpu -= usr_cpu;
     });
+    net_from_account += usr_net;
+    cpu_from_account += cpu_net;
   } else {
     auto amount_tx_net = pending_itr->net - net;
     auto amount_tx_cpu = pending_itr->cpu - cpu;
 
-    if (amount_tx_cpu >= asset(0)) {  // if enough to cover with tx
+    if (amount_tx_cpu >= asset(0)) {
+      // if enough to cover with tx
       pendingtxs.modify(pending_itr, 0,
                         [&](auto& tx) { tx.cpu = amount_tx_cpu; });
+      cpu_from_tx += cpu;
     } else {  // split with tx and account
       pendingtxs.modify(pending_itr, 0, [&](auto& tx) { tx.cpu = asset(0); });
+      cpu_from_tx += pending_itr->cpu;
       accounts.modify(itr, 0,
-                      [&](auto& acnt) { acnt.resource_cpu += amount_tx_cpu; });
+                      [&](auto& acnt) { acnt.resource_cpu -= -amount_tx_cpu; });
+      cpu_from_account += -amount_tx_cpu;     
     }
 
     if (amount_tx_net >= asset(0)) {
       pendingtxs.modify(pending_itr, 0,
                         [&](auto& tx) { tx.net = amount_tx_net; });
+      net_from_tx += net;
     } else {
       pendingtxs.modify(pending_itr, 0, [&](auto& tx) { tx.net = asset(0); });
+      net_from_tx += pending_itr->net;
       accounts.modify(itr, 0,
-                      [&](auto& acnt) { acnt.resource_net += amount_tx_net; });
+                      [&](auto& acnt) { acnt.resource_net -= -amount_tx_net; });
+      net_from_account += -amount_tx_net;  
     }
 
     if (pending_itr->is_empty()) {
@@ -106,8 +121,8 @@ void resource_exchange::sellstake(account_name user, asset net, asset cpu) {
     }
   }
 
-  // TODO mark as liquid on the next cycle when refunded (not refunding here)
-  state_on_sellstake(net + cpu);
+  eosio_assert((net+cpu) == (net_from_account+cpu_from_account+net_from_tx+cpu_from_tx), "sold stake calculation error");
+  state_on_sellstake(net_from_account+cpu_from_account, net_from_tx+cpu_from_tx);
 }
 
 }  // namespace eosio

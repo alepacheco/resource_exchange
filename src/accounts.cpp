@@ -33,15 +33,13 @@ void resource_exchange::withdraw(account_name to, asset quantity) {
   eosio_assert(quantity.is_valid(), "invalid quantity");
   eosio_assert(quantity.amount > 0, "must withdraw positive quantity");
   asset liquid_funds = contract_balance.find(asset().symbol.name())->balance;
-  if (liquid_funds >= quantity) {
-    // can withdraw now
-
-  } else {
+  if (quantity > liquid_funds) {
+    // TODO check if funds on refund, else force overdraft
     // retry next cycle
     eosio::transaction out;
     out.actions.emplace_back(
-        permission_level(_contract, N(active)), N(eosio.token), N(transfer),
-        std::make_tuple(_contract, to, quantity, std::string("")));
+        permission_level(to, N(active)), _self, N(withdraw),
+        std::make_tuple(to, quantity));
 
     out.delay_sec = CYCLE_TIME + 100;
     out.send(to, _contract);
@@ -49,7 +47,6 @@ void resource_exchange::withdraw(account_name to, asset quantity) {
 
   auto state = contract_state.get();
   auto itr = accounts.find(to);
-  print(name{to});
   eosio_assert(itr != accounts.end(), "unknown account");
 
   accounts.modify(itr, 0, [&](auto& acnt) {
@@ -59,14 +56,10 @@ void resource_exchange::withdraw(account_name to, asset quantity) {
 
   state_on_withdraw(quantity);
 
-  // if liquid withdraw now, else wait tree days
-  // ! FIX
-  if (quantity <= liquid_funds) {
-    action(permission_level(_contract, N(active)), N(eosio.token), N(transfer),
-           std::make_tuple(_contract, to, quantity, std::string("")))
+  action(permission_level(_contract, N(active)), N(eosio.token), N(transfer),
+    std::make_tuple(_contract, to, quantity, std::string("")))
         .send();
-  } else {
-  }
+ 
 
   if (itr->is_empty()) {
     accounts.erase(itr);

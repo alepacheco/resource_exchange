@@ -11,6 +11,7 @@ class resource_exchange : public eosio::contract {
  private:
   account_name _contract;
   const uint32_t CYCLE_TIME = 60 * 60 * 25 * 3;  // 3 days and three hours
+  const int PRICE_TUNE = 10000;
 
   struct stake_trade {
     account_name user;
