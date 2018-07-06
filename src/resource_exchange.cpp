@@ -43,6 +43,10 @@ void resource_exchange::apply(account_name contract, account_name act) {
       cycle();
       break;
     }
+    case N(calcosttoken): {
+      calcosttoken();
+      break;
+    }
   }
 }
 

@@ -111,6 +111,7 @@ class resource_exchange : public eosio::contract {
   asset billaccount(account_name account, double cost_per_token);
   void matchbandwidth(account_name user);
   void payreward(account_name user, asset fee_collected);
+  double cost_function(double total, double liquid, int TUNE);
   void unstakeunknown();
 
   void state_on_deposit(asset quantity);
@@ -153,6 +154,8 @@ class resource_exchange : public eosio::contract {
   void withdraw(account_name user, asset quantity);
 
   asset calcost(asset res);
+
+  /// @abi action
   double calcosttoken();
 
   /// @abi action

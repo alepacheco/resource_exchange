@@ -4,3 +4,5 @@
 *.wasm
 bin/
 node_modules/
+webapp/package-lock.json
+.vs/slnx.sqlite
