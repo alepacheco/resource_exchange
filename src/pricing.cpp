@@ -50,20 +50,12 @@ double resource_exchange::calcosttoken() {
 }
 
 void resource_exchange::payreward(account_name user, asset fee_collected) {
-  const double FEE_SHARE = 1;
   auto state = contract_state.get();
-  double fees = fee_collected.amount * FEE_SHARE;
-  double fees_devs = fee_collected.amount - fees;
-  double reward_per_token = fees / state.get_total().amount;
+  double reward_per_token = fee_collected.amount / state.get_total().amount;
   auto acnt = accounts.find(user);
   double reward = acnt->balance.amount * reward_per_token;
   accounts.modify(acnt, 0,
                   [&](auto& account) { account.balance += asset(reward); });
-
-  if (fees_devs > 0) {
-    // pay devs
-    // remove from liquid
-  }
 }
 
 asset resource_exchange::billaccount(account_name owner,

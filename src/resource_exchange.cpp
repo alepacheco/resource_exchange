@@ -86,10 +86,13 @@ void resource_exchange::docycle() {
     fees_collected += billaccount(acnt->owner, cost_per_token);
     matchbandwidth(acnt->owner);
   }
+  asset fees_devs = fees_collected * 0.1;
   for (auto acnt = accounts.begin(); acnt != accounts.end(); ++acnt) {
-    payreward(acnt->owner, fees_collected);
+    payreward(acnt->owner, fees_collected - fees_devs);
   }
   unstakeunknown();
+
+  // TODO paydevs
   state_cycle();
 
   print("Total fees: ", fees_collected, " ");

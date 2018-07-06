@@ -30,6 +30,7 @@ void resource_exchange::deposit(currency::transfer tx) {
  * be unstaked and accesible on 3 days
  **/
 void resource_exchange::withdraw(account_name to, asset quantity) {
+  // TODO cancel buy tx if cant pay for it
   eosio_assert(quantity.is_valid(), "invalid quantity");
   eosio_assert(quantity.amount > 0, "must withdraw positive quantity");
   auto state = contract_state.get();
