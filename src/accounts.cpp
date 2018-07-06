@@ -38,6 +38,7 @@ void resource_exchange::withdraw(account_name to, asset quantity) {
   if (quantity > state.liquid_funds) {
     if (quantity > state.get_unstaked()) {
       // force overdraft
+      eosio_assert(false, "cannot withdraw");
     } else {
       // retry next cycle
       eosio::transaction out;

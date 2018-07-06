@@ -46,9 +46,6 @@ void resource_exchange::apply(account_name contract, account_name act) {
   }
 }
 
-/**
- * Cycle is run every CYCLE_TIME
- **/
 void resource_exchange::cycle() {
   print("Run cycle\n");
   auto secs_to_next = time_point_sec(CYCLE_TIME);
@@ -58,17 +55,6 @@ void resource_exchange::cycle() {
   eosio::transaction out;
   out.actions.emplace_back(permission_level(_contract, N(active)), _contract,
                            N(cycle), _contract);
-
-  // TODO check for double runs
-
-  // if ((state.timestamp.utc_seconds + secs_to_next.utc_seconds) >
-  //     this_time.utc_seconds) {
-  //   out.delay_sec = (state.timestamp.utc_seconds + secs_to_next.utc_seconds)
-  //   -
-  //                   (this_time.utc_seconds + secs_flexibility.utc_seconds);
-  //   out.send(this_time.utc_seconds, _contract);
-  //   return;
-  // }
 
   docycle();
 
@@ -86,7 +72,7 @@ void resource_exchange::docycle() {
     fees_collected += billaccount(acnt->owner, cost_per_token);
     matchbandwidth(acnt->owner);
   }
-  asset fees_devs = fees_collected * 0.1;
+  asset fees_devs = asset(fees_collected.amount * 0.1);
   for (auto acnt = accounts.begin(); acnt != accounts.end(); ++acnt) {
     payreward(acnt->owner, fees_collected - fees_devs);
   }
