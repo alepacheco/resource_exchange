@@ -86,7 +86,7 @@ void resource_exchange::sellstake(account_name user, asset net, asset cpu) {
       acnt.resource_cpu -= usr_cpu;
     });
     net_from_account += usr_net;
-    cpu_from_account += cpu_net;
+    cpu_from_account += usr_cpu;
   } else {
     auto amount_tx_net = pending_itr->net - net;
     auto amount_tx_cpu = pending_itr->cpu - cpu;
@@ -101,7 +101,7 @@ void resource_exchange::sellstake(account_name user, asset net, asset cpu) {
       cpu_from_tx += pending_itr->cpu;
       accounts.modify(itr, 0,
                       [&](auto& acnt) { acnt.resource_cpu -= -amount_tx_cpu; });
-      cpu_from_account += -amount_tx_cpu;     
+      cpu_from_account += -amount_tx_cpu;
     }
 
     if (amount_tx_net >= asset(0)) {
@@ -113,7 +113,7 @@ void resource_exchange::sellstake(account_name user, asset net, asset cpu) {
       net_from_tx += pending_itr->net;
       accounts.modify(itr, 0,
                       [&](auto& acnt) { acnt.resource_net -= -amount_tx_net; });
-      net_from_account += -amount_tx_net;  
+      net_from_account += -amount_tx_net;
     }
 
     if (pending_itr->is_empty()) {
@@ -121,8 +121,11 @@ void resource_exchange::sellstake(account_name user, asset net, asset cpu) {
     }
   }
 
-  eosio_assert((net+cpu) == (net_from_account+cpu_from_account+net_from_tx+cpu_from_tx), "sold stake calculation error");
-  state_on_sellstake(net_from_account+cpu_from_account, net_from_tx+cpu_from_tx);
+  eosio_assert((net + cpu) == (net_from_account + cpu_from_account +
+                               net_from_tx + cpu_from_tx),
+               "sold stake calculation error");
+  state_on_sellstake(net_from_account + cpu_from_account,
+                     net_from_tx + cpu_from_tx);
 }
 
 }  // namespace eosio

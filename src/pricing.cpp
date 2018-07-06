@@ -66,7 +66,6 @@ void resource_exchange::payreward(account_name user, asset fee_collected) {
   }
 }
 
-
 asset resource_exchange::billaccount(account_name owner,
                                      double cost_per_token) {
   auto acnt = accounts.find(owner);

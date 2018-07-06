@@ -32,20 +32,23 @@ void resource_exchange::deposit(currency::transfer tx) {
 void resource_exchange::withdraw(account_name to, asset quantity) {
   eosio_assert(quantity.is_valid(), "invalid quantity");
   eosio_assert(quantity.amount > 0, "must withdraw positive quantity");
-  asset liquid_funds = contract_balance.find(asset().symbol.name())->balance;
-  if (quantity > liquid_funds) {
-    // TODO check if funds on refund, else force overdraft
-    // retry next cycle
-    eosio::transaction out;
-    out.actions.emplace_back(
-        permission_level(to, N(active)), _self, N(withdraw),
-        std::make_tuple(to, quantity));
+  auto state = contract_state.get();
 
-    out.delay_sec = CYCLE_TIME + 100;
-    out.send(to, _contract);
+  if (quantity > state.liquid_funds) {
+    if (quantity > state.get_unstaked()) {
+      // force overdraft
+    } else {
+      // retry next cycle
+      eosio::transaction out;
+      out.actions.emplace_back(permission_level(to, N(active)), _self,
+                               N(withdraw), std::make_tuple(to, quantity));
+
+      out.delay_sec = CYCLE_TIME + 100;
+      out.send(to, _contract);
+      return;
+    }
   }
 
-  auto state = contract_state.get();
   auto itr = accounts.find(to);
   eosio_assert(itr != accounts.end(), "unknown account");
 
@@ -57,9 +60,8 @@ void resource_exchange::withdraw(account_name to, asset quantity) {
   state_on_withdraw(quantity);
 
   action(permission_level(_contract, N(active)), N(eosio.token), N(transfer),
-    std::make_tuple(_contract, to, quantity, std::string("")))
-        .send();
- 
+         std::make_tuple(_contract, to, quantity, std::string("")))
+      .send();
 
   if (itr->is_empty()) {
     accounts.erase(itr);

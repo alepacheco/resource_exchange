@@ -42,9 +42,17 @@ class resource_exchange : public eosio::contract {
     asset liquid_funds;
     asset total_stacked;
     time_point_sec timestamp;
+    asset to_be_refunding;
+    asset refunding;
 
-    asset get_total() const { return liquid_funds + total_stacked; }
-    EOSLIB_SERIALIZE(state_t, (liquid_funds)(total_stacked)(timestamp))
+    asset get_total() const {
+      return liquid_funds + total_stacked + to_be_refunding + refunding;
+    }
+    asset get_unstaked() const {
+      return liquid_funds + to_be_refunding + refunding;
+    }
+    EOSLIB_SERIALIZE(state_t, (liquid_funds)(total_stacked)(timestamp)(
+                                  to_be_refunding)(refunding))
   };
 
   //@abi table account i64
@@ -108,11 +116,13 @@ class resource_exchange : public eosio::contract {
   void state_on_deposit(asset quantity);
   void state_on_withdraw(asset quantity);
   void state_set_timestamp(time_point_sec this_time);
-  void state_on_sellstake(asset stake);
+  void state_on_sellstake(asset stake_from_account, asset stake_from_tx);
   void state_on_buystake(asset stake);
   void state_on_reset_account(asset account_res);
   void state_on_undelegate_unknown(asset delegated);
+  void state_unstake_delayed(asset amount);
   void state_change(asset liquid, asset staked);
+  void state_cycle();
   void state_init();
 
   void docycle();

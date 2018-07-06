@@ -63,7 +63,8 @@ void resource_exchange::cycle() {
 
   // if ((state.timestamp.utc_seconds + secs_to_next.utc_seconds) >
   //     this_time.utc_seconds) {
-  //   out.delay_sec = (state.timestamp.utc_seconds + secs_to_next.utc_seconds) -
+  //   out.delay_sec = (state.timestamp.utc_seconds + secs_to_next.utc_seconds)
+  //   -
   //                   (this_time.utc_seconds + secs_flexibility.utc_seconds);
   //   out.send(this_time.utc_seconds, _contract);
   //   return;
@@ -89,6 +90,7 @@ void resource_exchange::docycle() {
     payreward(acnt->owner, fees_collected);
   }
   unstakeunknown();
+  state_cycle();
 
   print("Total fees: ", fees_collected, " ");
 }
