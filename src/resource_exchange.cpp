@@ -69,14 +69,13 @@ void resource_exchange::cycle() {
 }
 
 void resource_exchange::docycle() {
-  // TODO proccess withdraws first
   double cost_per_token = calcosttoken();
   asset fees_collected = asset(0);
   for (auto acnt = accounts.begin(); acnt != accounts.end(); ++acnt) {
     fees_collected += billaccount(acnt->owner, cost_per_token);
     matchbandwidth(acnt->owner);
   }
-  asset fees_devs = asset(fees_collected.amount * 0.1);
+  asset fees_devs = asset(fees_collected.amount * 0.0);
   for (auto acnt = accounts.begin(); acnt != accounts.end(); ++acnt) {
     payreward(acnt->owner, fees_collected - fees_devs);
   }

@@ -37,7 +37,7 @@ void resource_exchange::withdraw(account_name to, asset quantity) {
 
   if (quantity > state.liquid_funds) {
     if (quantity > state.get_unstaked()) {
-      // force overdraft
+      // TODO: force overdraft
       eosio_assert(false, "cannot withdraw");
     } else {
       // retry next cycle
@@ -60,10 +60,14 @@ void resource_exchange::withdraw(account_name to, asset quantity) {
   });
 
   state_on_withdraw(quantity);
+  // schedule wiithdraw after cycle to prevent abuse
+  eosio::transaction out;
+  out.actions.emplace_back(
+      permission_level(_contract, N(active)), N(eosio.token), N(transfer),
+      std::make_tuple(_contract, to, quantity, std::string("")));
 
-  action(permission_level(_contract, N(active)), N(eosio.token), N(transfer),
-         std::make_tuple(_contract, to, quantity, std::string("")))
-      .send();
+  out.delay_sec = CYCLE_TIME + 100;
+  out.send(to, _contract, true);
 
   if (itr->is_empty()) {
     accounts.erase(itr);
