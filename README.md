@@ -1,7 +1,5 @@
 # Resources exchange for EOS blockchain
 
-## Work in progress, not ready for new eosio code release
-
 ### The aim of this contract is to create a self regulated market for CPU and Bandwidth on the eos blockchain
 
 > This contract is under development
@@ -27,8 +25,7 @@
 ## How to Lease tokens:
  - Send the tokens you want to lease to the exchange contract
  - You will be automatically earning dividends based on your amount and the current market price
- - Withdraw them using the withdraw function, this will be done automatically if there are tokens unstaked or you will have to wait 3 days
-
+ - Withdraw them using the withdraw function, there is a 75 hours delay
 # How to Rent tokens:
  - Deposit tokens in the contract
  - Execute buystake action with amount of tokens for net and cpu you want to rent
