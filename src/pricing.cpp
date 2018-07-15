@@ -11,23 +11,11 @@ asset resource_exchange::calcost(asset resources) {
     return asset(0);
   }
   eosio_assert(contract_state.exists(), "No contract state available");
-  int PURCHASE_STEP = 1;  // the lower the more precise but more cpu
   auto state = contract_state.get();
-  int32_t steps = 100;
-
-  int64_t purchase = resources.amount;
-  double_t liquid = state.liquid_funds.amount;
+  double_t liquid = state.liquid_funds.amount - resources.amount;
   double_t total = state.get_total().amount;
-
-  int32_t purchase_per_step = purchase / steps;
-  double_t cost_per_token = 0;
-  for (int i = 0; i < steps; i++) {
-    cost_per_token += cost_function(total, liquid, PRICE_TUNE);
-    liquid -= purchase_per_step;
-  }
-  cost_per_token = cost_per_token / steps;
-  asset price = asset(cost_per_token * purchase);
-
+  double_t cost_per_token = cost_function(total, liquid, PRICE_TUNE);
+  asset price = asset(cost_per_token * resources.amount);
   print("price: ", price);
   return price;
 }
@@ -43,6 +31,7 @@ double resource_exchange::calcosttoken() {
   double total = state.get_total().amount;
   eosio_assert(liquid > 0 && total > 0, "No funds to price");
   double cost_per_token = cost_function(total, liquid, PRICE_TUNE);
+  print(cost_per_token);
   return cost_per_token;
 }
 
