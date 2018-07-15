@@ -11,24 +11,24 @@ asset resource_exchange::calcost(asset resources) {
     return asset(0);
   }
   eosio_assert(contract_state.exists(), "No contract state available");
-  int PURCHASE_STEP = 10000;  // the lower the more precise but more cpu
+  int PURCHASE_STEP = 1;  // the lower the more precise but more cpu
   auto state = contract_state.get();
+  int32_t steps = 100;
+
   int64_t purchase = resources.amount;
   double_t liquid = state.liquid_funds.amount;
   double_t total = state.get_total().amount;
 
-  // purchases of 1 EOS at a time, to get fair price as the resources get
-  // scarcer
-  int32_t steps = purchase / PURCHASE_STEP;
+  int32_t purchase_per_step = purchase / steps;
   double_t cost_per_token = 0;
   for (int i = 0; i < steps; i++) {
     cost_per_token += cost_function(total, liquid, PRICE_TUNE);
-    liquid -= PURCHASE_STEP;
+    liquid -= purchase_per_step;
   }
   cost_per_token = cost_per_token / steps;
-
   asset price = asset(cost_per_token * purchase);
-  print("price: ", price, "\n");
+
+  print("price: ", price);
   return price;
 }
 
@@ -46,9 +46,10 @@ double resource_exchange::calcosttoken() {
   return cost_per_token;
 }
 
-double resource_exchange::cost_function(double total, double liquid, int TUNE) {
+double resource_exchange::cost_function(double total, double liquid, double TUNE) {
   double used = total - liquid;
-  return 0.005 + (used * used) / (total * 1.5 - liquid);
+  double price = 1.0 / (-used + (total * PRICE_GAP));
+  return price / TUNE;
 }
 
 void resource_exchange::payreward(account_name user, asset fee_collected) {

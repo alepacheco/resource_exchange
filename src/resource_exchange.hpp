@@ -11,7 +11,8 @@ class resource_exchange : public eosio::contract {
  private:
   account_name _contract;
   const uint32_t CYCLE_TIME = 60 * 60 * 25 * 3;  // 3 days and three hours
-  const int PRICE_TUNE = 10000;
+  const double PRICE_TUNE = 0.000001;
+  const double PRICE_GAP = 0.9;
 
   struct stake_trade {
     account_name user;
@@ -111,7 +112,7 @@ class resource_exchange : public eosio::contract {
   asset billaccount(account_name account, double cost_per_token);
   void matchbandwidth(account_name user);
   void payreward(account_name user, asset fee_collected);
-  double cost_function(double total, double liquid, int TUNE);
+  double cost_function(double total, double liquid, double TUNE);
   void unstakeunknown();
 
   void state_on_deposit(asset quantity);

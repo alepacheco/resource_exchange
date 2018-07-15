@@ -31,7 +31,8 @@ void resource_exchange::buystake(account_name from, asset net, asset cpu) {
   asset adj_cpu = cpu + pending_itr->cpu;
 
   auto state = contract_state.get();
-  eosio_assert(state.liquid_funds >= (adj_net + adj_cpu),
+  eosio_assert(state.liquid_funds.amount * PRICE_GAP >=
+                   (adj_net.amount + adj_cpu.amount),
                "not enough resources in exchange");
 
   asset cost = calcost(adj_net + adj_cpu);
