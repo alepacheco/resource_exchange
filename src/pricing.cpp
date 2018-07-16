@@ -14,7 +14,7 @@ asset resource_exchange::calcost(asset resources) {
   auto state = contract_state.get();
   double_t liquid = state.liquid_funds.amount - resources.amount;
   double_t total = state.get_total().amount;
-  double_t cost_per_token = cost_function(total, liquid, PRICE_TUNE);
+  double_t cost_per_token = cost_function(total, liquid);
   asset price = asset(cost_per_token * resources.amount);
   print("price: ", price);
   return price;
@@ -26,19 +26,18 @@ asset resource_exchange::calcost(asset resources) {
 double resource_exchange::calcosttoken() {
   eosio_assert(contract_state.exists(), "No contract state available");
   auto state = contract_state.get();
-  double larimer_per_token = 10000;
   double liquid = state.liquid_funds.amount;
   double total = state.get_total().amount;
   eosio_assert(liquid > 0 && total > 0, "No funds to price");
-  double cost_per_token = cost_function(total, liquid, PRICE_TUNE);
+  double cost_per_token = cost_function(total, liquid);
   print(cost_per_token);
   return cost_per_token;
 }
 
-double resource_exchange::cost_function(double total, double liquid, double TUNE) {
+double resource_exchange::cost_function(double total, double liquid) {
   double used = total - liquid;
   double price = 1.0 / (-used + (total * PRICE_GAP));
-  return price / TUNE;
+  return price / PRICE_TUNE;
 }
 
 void resource_exchange::payreward(account_name user, asset fee_collected) {
